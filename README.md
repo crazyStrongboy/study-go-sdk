@@ -1,1 +1,1 @@
-"# study-go-sdk" 
+# study-go-sdk
