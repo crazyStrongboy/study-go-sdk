@@ -419,5 +419,3 @@ func main() {
 	c <- 1 //panic: send on closed channel
 }
 ```
-
-##### 18.
