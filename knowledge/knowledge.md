@@ -257,3 +257,167 @@ func main() {
         - 子字符串操作
         - 子切片操作
         - 加减乘除等运算符
+        
+        
+##### 12.利用BCE（边界检查消除）进行性能优化
+go是一个内存安全的语言，在数组和切片的操作过程中，总是会检查角标是否越界，越界将会产生一个panic。这样的检查叫做边界检查。边界检查使程序能够安全的运行，但是会降低部分效率。但是利用BCE（bounds check elimination,边界检查消除）可以避免不必要的边界检查，避免很多重复表达式的计算，使得编译器的执行效率会更高。
+```go
+package main
+
+import (
+	"strings"
+	"testing"
+)
+
+func NumSameBytes_1(x, y string) int {
+	if len(x) > len(y) {
+		x, y = y, x
+	}
+	for i := 0; i < len(x); i++ {
+		if x[i] != y[i] {
+			return i
+		}
+	}
+	return len(x)
+}
+
+func NumSameBytes_2(x, y string) int {
+	if len(x) > len(y) {
+		x, y = y, x
+	}
+	if len(x) <= len(y) { // 虽然代码多了，但是效率提高了
+		for i := 0; i < len(x); i++ {
+			if x[i] != y[i] { // 边界检查被消除了
+				return i
+			}
+		}
+	}
+	return len(x)
+}
+
+var x = strings.Repeat("hello", 100) + " world!"
+var y = strings.Repeat("hello", 99) + " world!"
+
+func BenchmarkNumSameBytes_1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NumSameBytes_1(x, y)
+	}
+}
+
+func BenchmarkNumSameBytes_2(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NumSameBytes_2(x, y)
+	}
+}
+
+```
+运行结果如下：
+```go
+BenchmarkNumSameBytes_1-8   	 5000000	       275 ns/op
+BenchmarkNumSameBytes_2-8   	10000000	       251 ns/op
+```
+由此可见，NumSameBytes_2比NumSameBytes_1的效率更高。其原因是NumSameBytes_2中进行了BCE。
+
+##### 13.如何在不导入reflect包的情况下检查一个值是否拥有一个方法？
+```go
+package main
+
+import "fmt"
+
+type A int
+type B int
+func (b B) M(x int) string {
+	return fmt.Sprint(b, ": ", x)
+}
+
+func check(v interface{}) bool {
+	_, has := v.(interface{M(int) string})
+	return has
+}
+
+func main() {
+	var a A = 123
+	var b B = 789
+	fmt.Println(check(a)) // false
+	fmt.Println(check(b)) // true
+}
+```
+
+##### 14.不可寻址的数组的元素依旧是不可寻址的，但是不可寻址的切片的元素总是可寻址的。
+原因是一个数组值的元素和此数组存储在同一个内存块中。 但是切片的情况大不相同。
+
+切片的内部结构：
+```go
+type SliceHeader struct {
+	Data uintptr
+	Len  int
+	Cap  int
+}
+```
+一个切片间接的引用一个元素序列。对于任何一个非空切片而言，它的内部元素序列需要开辟在内存中的某处因而必须是可取地址的。取一个元素的地址实际上就是取内部元素序列上的元素地址，这也就是为什么不可寻址的非空切片的元素是可以被取地址的。
+```go
+package main
+
+func main() {
+	// 组合字面量是不可寻址的。
+
+	/* 取容器元素的地址。 */
+
+	// 取不可寻址的切片的元素的地址是没问题的
+	_ = &[]int{1}[0]
+	// error: 不能取不可寻址的数组的元素的地址
+	_ = &[5]int{}[0]
+
+	/* 修改元素值。 */
+
+	// 修改不可寻址的切片的元素是没问题的
+	[]int{1,2,3}[1] = 9
+	// error: 不能修改不可寻址的数组的元素
+	[3]int{1,2,3}[1] = 9
+}
+```
+
+##### 15.以相同实参调用两次errors.New函数返回的两个error值是不相等的。
+原因是errors.New函数会复制输入的字符串实参至一个局部变量并取此局部变量的指针作为返回error值的动态值。 两次调用会产生两个不同的指针。
+```go
+// New returns an error that formats as the given text.
+func New(text string) error {
+	return &errorString{text}
+}
+```
+example:
+```go
+package main
+
+import "fmt"
+import "errors"
+
+func main() {
+	notfound := "not found"
+	a, b := errors.New(notfound), errors.New(notfound)
+	fmt.Println(a == b) // false
+}
+```
+
+##### 16.单向接收通道无法被关闭。
+```go
+func close(c chan<- Type) //这个方法仅仅只能被sender使用，不能被receiver使用
+```
+example:
+```go
+func foo(c <-chan int) {
+	close(c) // error: 不能关闭单向接收通道
+}
+```
+##### 17.向已关闭的通道发送一个值，导致panic
+```go
+package main
+
+func main() {
+	c := make(chan int)
+	close(c)
+	c <- 1 //panic: send on closed channel
+}
+```
+
+##### 18.
