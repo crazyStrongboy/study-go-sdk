@@ -17,3 +17,8 @@ func main() {
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&s1))
 	fmt.Println(*(*int)(unsafe.Pointer(sh.Data - unsafe.Sizeof(s[0]))))
 }
+
+func g(s []int) {
+	s1 := append(s[:0:0], s[1:3:3]...)
+	fmt.Println(s1)
+}
