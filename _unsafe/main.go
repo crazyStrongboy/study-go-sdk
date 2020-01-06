@@ -9,14 +9,17 @@ import (
 @Time : 2020/1/3
 @Author : hejun
 */
+type A struct {
+	_    int
+	Name string
+}
+
 func main() {
-	array := [...]int{0, 1, -2, 3, 4}
-	pointer := &array[0]
-	fmt.Print(*pointer, " ")
-	memoryAddress := uintptr(unsafe.Pointer(pointer)) + unsafe.Sizeof(array[0])
-	for i := 0; i < len(array)-1; i++ {
-		pointer = (*int)(unsafe.Pointer(memoryAddress))
-		fmt.Print(*pointer, " ")
-		memoryAddress = uintptr(unsafe.Pointer(pointer)) + unsafe.Sizeof(array[0])
-	}
+	a := A{Name: "hejun"}
+	align := unsafe.Alignof(a)
+	fmt.Printf("align: %d\n", align)
+	size := unsafe.Sizeof(a)
+	fmt.Printf("size: %d\n", size)
+	offset := unsafe.Offsetof(a.Name)
+	fmt.Printf("offset: %d,name: %s\n", offset, *(*string)(unsafe.Pointer(uintptr(unsafe.Pointer(&a)) + offset)))
 }
