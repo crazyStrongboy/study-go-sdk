@@ -129,8 +129,8 @@ type hchan struct {
 	elemtype *_type // 元素类型
 	sendx    uint   // 发送位置索引
 	recvx    uint   // 接收位置索引
-	recvq    waitq  // 接收者队列
-	sendq    waitq  // 发送者队列
+	recvq    waitq  // 接收者队列，一个双向链表
+	sendq    waitq  // 发送者队列，一个双向链表
 
 	lock mutex  // 锁，并发发送的时候需要上锁
 }
