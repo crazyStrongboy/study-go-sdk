@@ -91,3 +91,48 @@ func selectCase() {
    
 
 #### 源码分析
+
+首先了解下channel是怎么创建的？
+
+```go
+func main() {
+	c := make(chan int, 1)
+	close(c)
+}
+```
+
+通过`go tool compile -N -l -S main.go`输出其汇编代码，截取一小段观察一下：
+
+```go
+0x0024 00036 (main.go:9)        LEAQ    type.chan int(SB), AX // 将&chantype（元素类型是int）放到AX寄存器中
+0x002b 00043 (main.go:9)        PCDATA  $2, $0
+0x002b 00043 (main.go:9)        MOVQ    AX, (SP) // 也就是将&chantype放到SP（0）位置
+0x002f 00047 (main.go:9)        MOVQ    $1, 8(SP)// 将1放到SP（8）位置
+0x0038 00056 (main.go:9)        CALL    runtime.makechan(SB)// makechan(SP0,SP8)
+0x003d 00061 (main.go:9)        PCDATA  $2, $1
+0x003d 00061 (main.go:9)        MOVQ    16(SP), AX
+0x0042 00066 (main.go:9)        MOVQ    AX, "".c+24(SP)
+0x0047 00071 (main.go:10)       PCDATA  $2, $0
+0x0047 00071 (main.go:10)       MOVQ    AX, (SP)
+0x004b 00075 (main.go:10)       CALL    runtime.closechan(SB)
+```
+
+在上面的流程的关键部分加上了注释，也就是说咱们的`make(chan int, 1)`最终调用到了`runtime.makechan`这个方法。在进入分析之前先看看channel的结构：
+
+```go
+type hchan struct {
+	qcount   uint           // 队列中实际有多少个元素
+	dataqsiz uint           // channel的总长度（缓冲区的总长度）
+	buf      unsafe.Pointer // 指向底层元素的指针
+	elemsize uint16  // 元素类型的size
+	closed   uint32  // 是否关闭，0：未关闭， 1：已关闭
+	elemtype *_type // 元素类型
+	sendx    uint   // 发送位置索引
+	recvx    uint   // 接收位置索引
+	recvq    waitq  // 接收者队列
+	sendq    waitq  // 发送者队列
+
+	lock mutex  // 锁，并发发送的时候需要上锁
+}
+```
+
