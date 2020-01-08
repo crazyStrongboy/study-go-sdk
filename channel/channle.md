@@ -18,7 +18,7 @@ func main() {
 	fmt.Println(t)
 }
 ```
-几个注意点：
+几个注意点（后面会一一验证）：
 
 1. 向一个nil通道中发送一个值，将会永久阻塞。
 2. 向一个已关闭的通道中发送一个值，将会导致panic。
@@ -97,8 +97,8 @@ func selectCase() {
 
 ```go
 func main() {
-	c := make(chan int, 1)
-	close(c)
+    c := make(chan int, 1)//line: 9
+    close(c) //line: 10
 }
 ```
 
@@ -196,4 +196,253 @@ func makechan(t *chantype, size int) *hchan {
 
 
 ##### 发送流程
+
+```go
+func main() {
+	c := make(chan int, 1)
+	c <- 1 // line:9
+	close(c) //line:10
+}
+```
+
+通过`go tool compile -N -l -S main.go`输出其汇编代码，截取一小段观察一下：
+
+```go
+0x0057 00087 (main.go:9)        CALL    runtime.chansend1(SB)
+0x005c 00092 (main.go:10)       PCDATA  $2, $1
+0x005c 00092 (main.go:10)       PCDATA  $0, $0
+0x005c 00092 (main.go:10)       MOVQ    "".c+24(SP), AX
+0x0061 00097 (main.go:10)       PCDATA  $2, $0
+0x0061 00097 (main.go:10)       MOVQ    AX, (SP)
+0x0065 00101 (main.go:10)       CALL    runtime.closechan(SB)
+```
+
+从上面的汇编代码可以清晰的看到，`c<-1`就是一个简单的语法糖，实际上底层调用的是`runtime.chansend1`方法，咱们跟踪一下这个方法：
+
+```go
+// entry point for c <- x from compiled code
+//go:nosplit
+func chansend1(c *hchan, elem unsafe.Pointer) {
+	chansend(c, elem, true, getcallerpc())
+}
+```
+
+从上面的注释
+
+> entry point for c <- x from compiled code
+
+也可以看出来，这段代码是`c <- x `编译后的一个切入点。接着看下一个调用栈：
+
+```go
+func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
+	if c == nil {
+		if !block {
+			return false
+		}
+        // 从这里可以观察到，向一个nil的channel中发送一个值将会导致永久阻塞
+		gopark(nil, nil, waitReasonChanSendNilChan, traceEvGoStop, 2)
+		throw("unreachable")
+	}
+
+	if debugChan {
+		print("chansend: chan=", c, "\n")
+	}
+
+	if raceenabled {
+		racereadpc(c.raceaddr(), callerpc, funcPC(chansend))
+	}
+	// 通过chansend1方法调用是不会进入这个条件语句的，只有在select-case语句中，在通道未关闭
+    // 的情况下，满足 ①该channel是unbufferedChannel且接收队列为空 ②该channel是bufferedChannel
+    // 且缓冲区已满。 这两个条件中任意一个条件就可以快速返回false。表示投递失败
+	if !block && c.closed == 0 && ((c.dataqsiz == 0 && c.recvq.first == nil) ||
+		(c.dataqsiz > 0 && c.qcount == c.dataqsiz)) {
+		return false
+	}
+
+	var t0 int64
+	if blockprofilerate > 0 {
+		t0 = cputicks()
+	}
+	// 进行上锁，防止出现并发问题
+	lock(&c.lock)
+
+	if c.closed != 0 {
+        // 通道已经关闭，解锁的同时panic,这也证实了向一个已经关闭的通道发送值会导致panic
+		unlock(&c.lock)
+		panic(plainError("send on closed channel"))
+	}
+
+	if sg := c.recvq.dequeue(); sg != nil {
+        // 从等待接收的队列链表中取出一个接收者，然后将发送值拷贝到接收者提供的地址上面去
+		send(c, sg, ep, func() { unlock(&c.lock) }, 3)
+		return true
+	}
+
+	if c.qcount < c.dataqsiz {
+		// 当该通道时bufferedChannel时，缓冲区还未满的情况下，从缓冲区中取出一个内存块
+		qp := chanbuf(c, c.sendx)
+		if raceenabled {
+			raceacquire(qp)
+			racerelease(qp)
+		}
+        // 将发送值拷贝到上面取出的内存块上面去
+		typedmemmove(c.elemtype, qp, ep)
+        // 发送索引自增1
+		c.sendx++
+		if c.sendx == c.dataqsiz {
+            // 复用缓冲区，当索引位到缓冲区最后一位时，置位0
+			c.sendx = 0
+		}
+        // 缓冲区中存储的元素自增1
+		c.qcount++
+		unlock(&c.lock)
+		return true
+	}
+
+	if !block {
+		unlock(&c.lock)
+		return false
+	}
+
+	// 获取当前goroutine
+	gp := getg()
+    // 从当前goroutine所在的p上获取一个sudog结构体
+	mysg := acquireSudog()
+	mysg.releasetime = 0
+	if t0 != 0 {
+		mysg.releasetime = -1
+	}
+	// 将要发送的值赋值给sudog的elem字段，后面chanrecv会用到
+	mysg.elem = ep
+	mysg.waitlink = nil
+	mysg.g = gp
+	mysg.isSelect = false
+	mysg.c = c
+	gp.waiting = mysg
+	gp.param = nil
+    // 将mysg插入到发送队列的尾部
+	c.sendq.enqueue(mysg)
+    // 进行channel的解锁，并且将当前goroutine置为waiting状态。
+	goparkunlock(&c.lock, waitReasonChanSend, traceEvGoBlockSend, 3)
+	// 这里进行保活一下，防止接受者还没有拷贝过去，这个值就已经被gc给回收了
+	KeepAlive(ep)
+
+	// someone woke us up.
+	if mysg != gp.waiting {
+		throw("G waiting list is corrupted")
+	}
+	gp.waiting = nil
+	if gp.param == nil {
+		if c.closed == 0 {
+			throw("chansend: spurious wakeup")
+		}
+		panic(plainError("send on closed channel"))
+	}
+	gp.param = nil
+	if mysg.releasetime > 0 {
+		blockevent(mysg.releasetime-t0, 2)
+	}
+	mysg.c = nil
+    // 将当前使用的sudog放到空闲池中，供下一次使用
+	releaseSudog(mysg)
+	return true
+}
+```
+
+从上面的流程中，咱们也验证了使用时需要注意的两个点：
+
+1. 向一个空的`channel`中发送值将会导致永远阻塞。
+2. 向一个已关闭的`channel`中发送值将会导致panic。
+
+咱们可以将上述流程简单的总结为三个段：
+
+###### 存在等待接收的goroutine
+
+```go
+if sg := c.recvq.dequeue(); sg != nil {
+		send(c, sg, ep, func() { unlock(&c.lock) }, 3)
+		return true
+}
+// 常用的链表操作手段，取出队列中的第一个元素
+func (q *waitq) dequeue() *sudog {
+	for {
+		sgp := q.first
+		if sgp == nil {
+			return nil
+		}
+		y := sgp.next
+		if y == nil {
+			q.first = nil
+			q.last = nil
+		} else {
+			y.prev = nil
+			q.first = y
+			sgp.next = nil // mark as removed (see dequeueSudog)
+		}
+
+		....
+
+		return sgp
+	}
+}
+
+func send(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
+	....
+	if sg.elem != nil {
+        // 将sp,也就是发送值拷贝到sg.elem字段中
+		sendDirect(c.elemtype, sg, ep)
+		sg.elem = nil
+	}
+	....
+    // 唤醒当前接收的goroutine
+	goready(gp, skip+1)
+}
+```
+
+第一步：从接收队列中取出第一个sudog元素。
+
+第二步：将发送的值拷贝到sudog的elem字段上。
+
+第三步：唤醒与当前sudog绑定的处于waiting状态的goroutine。
+
+这个情况下，发送值只经过了一次拷贝，就被接收者消费掉了。
+
+
+
+###### 缓冲区还有可用的位置
+
+```go
+if c.qcount < c.dataqsiz {
+    qp := chanbuf(c, c.sendx)
+    if raceenabled {
+        raceacquire(qp)
+        racerelease(qp)
+    }
+    typedmemmove(c.elemtype, qp, ep)
+    c.sendx++
+    if c.sendx == c.dataqsiz {
+        c.sendx = 0
+    }
+    c.qcount++
+    unlock(&c.lock)
+    return true
+}
+```
+
+这个情况下，发送值会先进行一次拷贝到缓冲区中。然后在有接收者的情况下，会从缓冲去再拷贝一次，拷贝到接收者指定的内存地址上。在这个过程中，会先取出`qp := chanbuf(c, c.sendx)`缓冲区下一个可用的内存块，然后通过`typedmemmove(c.elemtype, qp, ep)`将值拷贝到相应的内存块中去。最后增加相应的索引位和缓冲区元素的个数。这里在满足条件的情况下会对索引位进行重置，进入下一个轮回。
+
+###### 阻塞发送
+
+```go
+...
+mysg := acquireSudog()
+...
+c.sendq.enqueue(mysg)
+goparkunlock(&c.lock, waitReasonChanSend, traceEvGoBlockSend, 3)
+...
+```
+
+
+
+在不满足上面两个条件的情况下，当前goroutine会保存部分信息到channel的发送者队列中，并且通过调用`goparkunlock`阻塞当前goroutine，直到有接收者消费掉了保存该goroutine的`sudog`，并调用`goready`方法，才会使当前陷入`waiting`状态的goroutine被重新唤醒。
 
