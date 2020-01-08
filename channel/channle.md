@@ -273,7 +273,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 	}
 
 	if sg := c.recvq.dequeue(); sg != nil {
-        // 从等待接收的队列链表中取出一个接收者，然后将发送值拷贝到接收者提供的地址上面去
+        // 从等待接收的队列链表中取出一个接收者，进行值的拷贝
 		send(c, sg, ep, func() { unlock(&c.lock) }, 3)
 		return true
 	}
@@ -445,4 +445,8 @@ goparkunlock(&c.lock, waitReasonChanSend, traceEvGoBlockSend, 3)
 
 
 在不满足上面两个条件的情况下，当前goroutine会保存部分信息到channel的发送者队列中，并且通过调用`goparkunlock`阻塞当前goroutine，直到有接收者消费掉了保存该goroutine的`sudog`，并调用`goready`方法，才会使当前陷入`waiting`状态的goroutine被重新唤醒。
+
+
+
+##### 接收流程
 
