@@ -251,7 +251,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 	if raceenabled {
 		racereadpc(c.raceaddr(), callerpc, funcPC(chansend))
 	}
-	// 通过chansend1方法调用是不会进入这个条件语句的，只有在select-case语句中，在通道未关闭
+	// 通过chansend1方法调用是不会进入这个条件语句的，在非阻塞并且通道未关闭
     // 的情况下，满足 ①该channel是unbufferedChannel且接收队列为空 ②该channel是bufferedChannel
     // 且缓冲区已满。 这两个条件中任意一个条件就可以快速返回false。表示投递失败
 	if !block && c.closed == 0 && ((c.dataqsiz == 0 && c.recvq.first == nil) ||
@@ -356,7 +356,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 
 咱们可以将上述流程简单的总结为三个段：
 
-###### 存在等待接收的goroutine
+###### 接收队列不为空
 
 ```go
 if sg := c.recvq.dequeue(); sg != nil {
@@ -449,4 +449,254 @@ goparkunlock(&c.lock, waitReasonChanSend, traceEvGoBlockSend, 3)
 
 
 ##### 接收流程
+
+```go
+func main() {
+	c := make(chan int, 1)
+	close(c)
+    <-c //line: 10
+}
+```
+
+通过`go tool compile -N -l -S main.go`输出其汇编代码，截取一小段观察一下：
+
+```go
+0x0055 00085 (main.go:10)       MOVQ    AX, (SP)
+0x0059 00089 (main.go:10)       MOVQ    $0, 8(SP)
+0x0062 00098 (main.go:10)       CALL    runtime.chanrecv1(SB)
+0x0067 00103 (main.go:11)       MOVQ    32(SP), BP
+0x006c 00108 (main.go:11)       ADDQ    $40, SP
+```
+
+实际上在第10行会触发`runtime.chanrecv1`方法，和上面的发送一样，也是个语法糖：
+
+```go
+// entry points for <- c from compiled code
+func chanrecv1(c *hchan, elem unsafe.Pointer) {
+	chanrecv(c, elem, true)
+}
+```
+
+这个方法有两个参数，一个是`hchan`指针，另一个是一个地址值，后面会将从通道中取出来的值复制到该地址值中去。接下来看一下核心的`chanrecv`方法，for-range包括select-case最终都会调用到这个方法。
+
+```go
+func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool) {
+	if debugChan {
+		print("chanrecv: chan=", c, "\n")
+	}
+
+	if c == nil {
+		if !block {
+			return
+		}
+        // 从一个nil通道中读取一个值也会被永远的阻塞
+		gopark(nil, nil, waitReasonChanReceiveNilChan, traceEvGoStop, 2)
+		throw("unreachable")
+	}
+
+	// 通过chanrecv1调用是不会进入这个代码块的，在非阻塞的情况下，如果通道长度为0并且发送队列为空，
+    // 或者通道长度大于0并且缓冲区中没有元素并且通道未关闭的情况下，进行快速返回
+	if !block && (c.dataqsiz == 0 && c.sendq.first == nil ||
+		c.dataqsiz > 0 && atomic.Loaduint(&c.qcount) == 0) &&
+		atomic.Load(&c.closed) == 0 {
+		return
+	}
+
+	var t0 int64
+	if blockprofilerate > 0 {
+		t0 = cputicks()
+	}
+	// 进行上锁
+	lock(&c.lock)
+
+	if c.closed != 0 && c.qcount == 0 {
+        // 通道已经关闭，并且缓冲区已经空了，返回该元素类型的零值
+		if raceenabled {
+			raceacquire(c.raceaddr())
+		}
+		unlock(&c.lock)
+		if ep != nil {
+			typedmemclr(c.elemtype, ep)
+		}
+		return true, false
+	}
+
+	if sg := c.sendq.dequeue(); sg != nil {
+		// 在发送队列不为空的情况下，取出一个sender，如果是unbufferedChannel，则直接从sender中拷贝
+        // 一个值到接收者；如果是一个bufferedChannel,从缓冲队列的recvx处取一个值，并且将sender中的
+        // 值拷贝到recvx索引的位置
+		recv(c, sg, ep, func() { unlock(&c.lock) }, 3)
+		return true, true
+	}
+
+	if c.qcount > 0 {
+		// 直接从缓冲区中取出对应recvx索引位置的值
+		qp := chanbuf(c, c.recvx)
+		if raceenabled {
+			raceacquire(qp)
+			racerelease(qp)
+		}
+       
+		if ep != nil {
+            // 拷贝qp中的值到指定的地址ep中
+			typedmemmove(c.elemtype, ep, qp)
+		}
+        // 将qp中的元素值清空成零值
+		typedmemclr(c.elemtype, qp)
+        // 接收索引进行自增
+		c.recvx++
+		if c.recvx == c.dataqsiz {
+			c.recvx = 0
+		}
+        // 缓冲区元素长度递减
+		c.qcount--
+		unlock(&c.lock)
+		return true, true
+	}
+
+	if !block {
+		unlock(&c.lock)
+		return false, false
+	}
+
+	// 发送队列为空，并且缓存区中也没有值，后续流程将会阻塞当前goroutine
+	gp := getg()
+    // 从当前g绑定的p中获取一个sudog(这一块是从一个缓存队列中获取)
+	mysg := acquireSudog()
+	mysg.releasetime = 0
+	if t0 != 0 {
+		mysg.releasetime = -1
+	}
+
+	mysg.elem = ep
+	mysg.waitlink = nil
+	gp.waiting = mysg
+	mysg.g = gp
+	mysg.isSelect = false
+	mysg.c = c
+	gp.param = nil
+    // 将mysg放到接收队列的尾部
+	c.recvq.enqueue(mysg)
+    // 将当前goroutine状态变为waiting,并且解开channel的锁
+	goparkunlock(&c.lock, waitReasonChanReceive, traceEvGoBlockRecv, 3)
+
+	// someone woke us up
+	if mysg != gp.waiting {
+		throw("G waiting list is corrupted")
+	}
+	gp.waiting = nil
+	if mysg.releasetime > 0 {
+		blockevent(mysg.releasetime-t0, 2)
+	}
+	closed := gp.param == nil
+	gp.param = nil
+	mysg.c = nil
+    // 释放sudog
+	releaseSudog(mysg)
+	return true, !closed
+}
+```
+
+接收流程和发送流程类似，可大概归结为四个段：
+
+###### 通道关闭且缓冲区为0
+
+```go
+if c.closed != 0 && c.qcount == 0 {
+    if raceenabled {
+        raceacquire(c.raceaddr())
+    }
+    unlock(&c.lock)
+    if ep != nil {
+        typedmemclr(c.elemtype, ep)
+    }
+    return true, false
+}
+```
+
+上述代码将直接返回一个对应元素类型的零值，分配零值的代码` typedmemclr(c.elemtype, ep)`，感兴趣的可以自己追踪一下。
+
+###### 发送队列不为空
+
+这一块可能和发送流程有点区别：
+
+```go
+if sg := c.sendq.dequeue(); sg != nil {
+    // 能进这里代表要么缓冲队列满了，要么该通道是一个无缓冲通道
+    recv(c, sg, ep, func() { unlock(&c.lock) }, 3)
+    return true, true
+}
+
+func recv(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
+	if c.dataqsiz == 0 {
+        // 代表这个通道是一个无缓冲通道
+		if raceenabled {
+			racesync(c, sg)
+		}
+		if ep != nil {
+			// 直接从sender中拷贝值
+			recvDirect(c.elemtype, sg, ep)
+		}
+	} else {
+        // 从缓冲区中直接取出recvx索引位置的值
+		qp := chanbuf(c, c.recvx)
+		if raceenabled {
+			raceacquire(qp)
+			racerelease(qp)
+			raceacquireg(sg.g, qp)
+			racereleaseg(sg.g, qp)
+		}
+		// 拷贝缓冲区中的值到指定的ep地址上
+		if ep != nil {
+			typedmemmove(c.elemtype, ep, qp)
+		}
+		// 这里多了一步流程，会将sender中的值存放到刚刚recvx位置处
+		typedmemmove(c.elemtype, qp, sg.elem)
+		c.recvx++
+		if c.recvx == c.dataqsiz {
+			c.recvx = 0
+		}
+		c.sendx = c.recvx // c.sendx = (c.sendx+1) % c.dataqsiz
+	}
+	sg.elem = nil
+	gp := sg.g
+	unlockf()
+	gp.param = unsafe.Pointer(sg)
+	if sg.releasetime != 0 {
+		sg.releasetime = cputicks()
+	}
+    // 唤醒当前sender的goroutine
+	goready(gp, skip+1)
+}
+```
+
+###### 缓冲区不为空
+
+```go
+if c.qcount > 0 {
+    // 读取缓冲区recvx索引处的值
+    qp := chanbuf(c, c.recvx)
+    if raceenabled {
+        raceacquire(qp)
+        racerelease(qp)
+    }
+    if ep != nil {
+        // 将上述的值拷贝到指定的地址ep中
+        typedmemmove(c.elemtype, ep, qp)
+    }
+    // 将recvx处的值置位零值
+    typedmemclr(c.elemtype, qp)
+    c.recvx++
+    if c.recvx == c.dataqsiz {
+        c.recvx = 0
+    }
+    c.qcount--
+    unlock(&c.lock)
+    return true, true
+}
+```
+
+###### 阻塞接收
+
+流程和上述的阻塞发送流程一致，不做过多介绍。
 
