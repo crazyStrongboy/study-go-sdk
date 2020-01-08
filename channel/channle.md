@@ -1,4 +1,5 @@
 ## channel
+
 #### 简介
 
 熟悉Go的人都知道，它提倡着不要通过共享内存来通讯，而要通过通讯来共享内存。Go提供了一种独特的并发同步技术来实现通过通讯来共享内存，此技术即为通道。我们可以把一个通道看作是在一个程序内部的一个FIFO数据队列。 一些协程可以向此通道发送数据，另外一些协程可以从此通道接收数据。
@@ -135,4 +136,64 @@ type hchan struct {
 	lock mutex  // 锁，并发发送的时候需要上锁
 }
 ```
+
+咱们可以将`hchan`中的`buf`简单的看成一个数组缓冲区，`qcount`是数组中实际存储元素的数量，`dataqsiz`是数组的容量，`elemtype`是数组元素的类型。`sendx`和`recvx`分别是发送索引位置和接收索引位置，每次操作都会自增1，当`sendx`和`recv`等于`dataqsiz`时，会重置为零。`recvq`和`sendq`都是双向链表，里面维护着等待接收和等待发送的`goroutine`。当多个`gouroutine`并发操作同一个`channel`时，会使用`lock`进行控制。
+
+##### 创建流程
+
+```go
+func makechan(t *chantype, size int) *hchan {
+	elem := t.elem
+
+	// 缓冲区中元素类型的尺寸不能超过16k
+	if elem.size >= 1<<16 {
+		throw("makechan: invalid channel element type")
+	}
+    // 判断是否位数对齐，
+	if hchanSize%maxAlign != 0 || elem.align > maxAlign {
+		throw("makechan: bad alignment")
+	}
+	// 计算缓冲区的总长度，并判断是否溢出
+	mem, overflow := math.MulUintptr(elem.size, uintptr(size))
+	if overflow || mem > maxAlloc-hchanSize || size < 0 {
+		panic(plainError("makechan: size out of range"))
+	}
+	var c *hchan
+	switch {
+	case mem == 0:
+		// channel长度或者元素类型尺寸为0时，也就是缓冲区长度为0时，只用分配hchan所占用的内存空间。
+		c = (*hchan)(mallocgc(hchanSize, nil, true))
+		// Race detector uses this location for synchronization.
+		c.buf = c.raceaddr()
+	case elem.kind&kindNoPointers != 0:
+		// 元素类型不是指针类型，则将hchan和buf一次性分配出来
+		c = (*hchan)(mallocgc(hchanSize+mem, nil, true))
+        // 缓冲区buf的指针位置在c+hchanSize（hchanSize补齐为8的倍数）
+		c.buf = add(unsafe.Pointer(c), hchanSize,hchanSize补齐为8的倍数)
+	default:
+		// 元素类型是指针类型，hchan和缓冲区单独分配
+		c = new(hchan)
+		c.buf = mallocgc(mem, elem, true)
+	}
+	// 元素的尺寸
+	c.elemsize = uint16(elem.size)
+	c.elemtype = elem
+	c.dataqsiz = uint(size)
+
+
+	return c
+}
+```
+
+创建channel时共分为三种情况：
+
+1. 缓冲区大小为0的情况下，只用给`hchan`分配内存即可。
+2. 当元素类型不为指针时，可以考虑分配一段连续的内存，这样方便垃圾回收。
+3. 当元素类型为指针时，需要给`hchan`和`buf`分别开辟空间。
+
+最终都调用到`mallocgc`方法进行内存的分配，分配过程这里不做过多的描述，后面会考虑写一篇文章介绍一下分配的相关流程。
+
+
+
+##### 发送流程
 
