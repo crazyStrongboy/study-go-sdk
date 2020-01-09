@@ -1,4 +1,4 @@
-## channel
+# channel的使用及源码解析
 
 #### 简介
 
@@ -36,7 +36,7 @@ func main() {
 ```
 它是一个阻塞型channel，必须要receiver也准备好的情况下，sender才能够将消息投递到c中去。可以结合下图进行思考一波：
 
-![unbuffer_channel](images/unbuffer_channel.png)
+![unbuffer_channel](http://images.hcyhj.cn/blogimages/channel/unbuffer_channel.png)
 
 ##### Buffered channels
 ```go
@@ -44,7 +44,7 @@ func main() {
 ```
 在buf未满之前，它是一个非阻塞型channel，sender可以将符合channel类型的值投递到channel中去，它内部会自己维护一个队列。当buf满了之后，sender会阻塞。可以结合下图进行思考一波：
 
-![buffer_channel](images/buffer_channel.png)
+![buffer_channel](http://images.hcyhj.cn/blogimages/channel/buffer_channel.png )
 
 #### 几种应用模式
 
@@ -675,7 +675,7 @@ func recv(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 1. 通道是unbuffered channel，则直接拷贝从发送队列中取出来的值。
 2. 通道是buffered channel，会进行两个操作，第一个是拷贝从缓冲区中取出相应的值，第二个是将发送队列中取出来的值拷贝到对应缓冲区的位置上。
 
-![](images/sendq_not_null.png)
+![](http://images.hcyhj.cn/blogimages/channel/sendq_not_null.png)
 
 在缓冲区是满的情况下，sendx和recvx指向同一个位置。例如上图：咱们取出recvx为2处的元素，然后会将sudog中的值拷贝到2位置处，同时sendx和recvx都指向3位置。
 
@@ -709,7 +709,7 @@ if c.qcount > 0 {
 
 直接从缓冲区中读取recvx索引位置中的值，将其拷贝大指定的指针中，然后将对应recvx处置位零值。
 
-![](images/sendq_is_null.png)
+![](http://images.hcyhj.cn/blogimages/channel/sendq_is_null.png)
 
 如上图所示，取出索引位置为3的元素后，将其置位零值，发送者下次填充buf时就可以从index=3的位置开始填充。
 
