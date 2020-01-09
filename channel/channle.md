@@ -823,6 +823,8 @@ func closechan(c *hchan) {
 
 ##### select-go流程
 
+这里主要是分析一下select-go接收流程，发送流程类似。
+
 ###### 单case分支（包含一个default）
 
 ```go
@@ -866,7 +868,7 @@ func main() {
 	c := make(chan int)
 	close(c)
 	select {
-	case <-c:
+	case <-c: //line：11
 	}
 }
 ```
@@ -885,7 +887,7 @@ func main() {
 
 ```go
 func chanrecv1(c *hchan, elem unsafe.Pointer) {
-    // 在从通道无法取出值的情况下，会进行阻塞当前goroutine，等待被唤醒
+    // 在从通道无法取出值的情况下，会阻塞当前goroutine，等待被唤醒
     // 具体实现流程参考上面的接收流程
 	chanrecv(c, elem, true)
 }
@@ -923,63 +925,26 @@ func main() {
 0x0134 00308 (main.go:13)       CALL    runtime.selectgo(SB)
 ```
 
-跟踪一下调用链：
+跟踪一下调用链（截取关键性流程代码，省略了计算`pollorder`和`lockorder`的部分）：
 
 ```go
 func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool) {
 	cas1 := (*[1 << 16]scase)(unsafe.Pointer(cas0))
 	order1 := (*[1 << 17]uint16)(unsafe.Pointer(order0))
-
+	// 获取所有的case
 	scases := cas1[:ncases:ncases]
 	pollorder := order1[:ncases:ncases]
 	lockorder := order1[ncases:][:ncases:ncases]
 
 	for i := range scases {
+       	// 遍历所以的case，将channel为空并且类型不是default的case置位一个空结构体scase
 		cas := &scases[i]
 		if cas.c == nil && cas.kind != caseDefault {
 			*cas = scase{}
 		}
 	}
-	for i := 1; i < ncases; i++ {
-		j := fastrandn(uint32(i + 1))
-		pollorder[i] = pollorder[j]
-		pollorder[j] = uint16(i)
-	}
-
-
-	for i := 0; i < ncases; i++ {
-		j := i
-		c := scases[pollorder[i]].c
-		for j > 0 && scases[lockorder[(j-1)/2]].c.sortkey() < c.sortkey() {
-			k := (j - 1) / 2
-			lockorder[j] = lockorder[k]
-			j = k
-		}
-		lockorder[j] = pollorder[i]
-	}
-	for i := ncases - 1; i >= 0; i-- {
-		o := lockorder[i]
-		c := scases[o].c
-		lockorder[i] = lockorder[0]
-		j := 0
-		for {
-			k := j*2 + 1
-			if k >= i {
-				break
-			}
-			if k+1 < i && scases[lockorder[k]].c.sortkey() < scases[lockorder[k+1]].c.sortkey() {
-				k++
-			}
-			if c.sortkey() < scases[lockorder[k]].c.sortkey() {
-				lockorder[j] = lockorder[k]
-				j = k
-				continue
-			}
-			break
-		}
-		lockorder[j] = o
-	}
-	// lock all the channels involved in the select
+	
+	// 在进行select的时候会锁住所有关联的channel
 	sellock(scases, lockorder)
 
 	var (
@@ -1012,9 +977,11 @@ loop:
 		case caseRecv:
 			sg = c.sendq.dequeue()
 			if sg != nil {
+                // 发送队列不为空，取队列的head，进行值的拷贝
 				goto recv
 			}
 			if c.qcount > 0 {
+                // 从缓冲区去获取值
 				goto bufrecv
 			}
 			if c.closed != 0 {
@@ -1022,27 +989,29 @@ loop:
 			}
 
 		case caseSend:
-			if raceenabled {
-				racereadpc(c.raceaddr(), cas.pc, chansendpc)
-			}
 			if c.closed != 0 {
+                // 这里会panic
 				goto sclose
 			}
 			sg = c.recvq.dequeue()
 			if sg != nil {
+                // 接收队列不为空，取队列head，进行值的拷贝
 				goto send
 			}
 			if c.qcount < c.dataqsiz {
+                // 缓冲区还有可用位置，拷贝到缓冲区
 				goto bufsend
 			}
 
 		case caseDefault:
+            // 这个分支不会break-for循环，所以优先级比较低一些
 			dfli = casi
 			dfl = cas
 		}
 	}
 
 	if dfl != nil {
+        // default被命中了，直接返回
 		selunlock(scases, lockorder)
 		casi = dfli
 		cas = dfl
@@ -1055,6 +1024,7 @@ loop:
 		throw("gp.waiting != nil")
 	}
 	nextp = &gp.waiting
+   
 	for _, casei := range lockorder {
 		casi = int(casei)
 		cas = &scases[casi]
@@ -1065,8 +1035,7 @@ loop:
 		sg := acquireSudog()
 		sg.g = gp
 		sg.isSelect = true
-		// No stack splits between assigning elem and enqueuing
-		// sg on gp.waiting where copystack can find it.
+		
 		sg.elem = cas.elem
 		sg.releasetime = 0
 		if t0 != 0 {
@@ -1076,7 +1045,7 @@ loop:
 		// Construct waiting list in lock order.
 		*nextp = sg
 		nextp = &sg.waitlink
-
+		 // 这里会将当前sudog放到每个case对应的channel队列中
 		switch cas.kind {
 		case caseRecv:
 			c.recvq.enqueue(sg)
@@ -1088,38 +1057,40 @@ loop:
 
 	// wait for someone to wake us up
 	gp.param = nil
+    // 阻塞当前goroutine，并给所有case对应的channel解锁
 	gopark(selparkcommit, nil, waitReasonSelect, traceEvGoBlockSelect, 1)
-
+	// 被唤醒后立即锁上select对应的所有的channel
 	sellock(scases, lockorder)
 
 	gp.selectDone = 0
+    // 因为唤醒的goroutine会将对应的sudog或者nil(channel关闭)放到当前goroutine的param参数上
+    // 取出命中的sudog供后面进行遍历比对
 	sg = (*sudog)(gp.param)
 	gp.param = nil
 
 	casi = -1
 	cas = nil
 	sglist = gp.waiting
-	// Clear all elem before unlinking from gp.waiting.
+	// 将sglist链路中所有sudog状态信息和元素指针清空
 	for sg1 := gp.waiting; sg1 != nil; sg1 = sg1.waitlink {
 		sg1.isSelect = false
 		sg1.elem = nil
 		sg1.c = nil
 	}
 	gp.waiting = nil
-
+	// 一个个进行比对
 	for _, casei := range lockorder {
 		k = &scases[casei]
 		if k.kind == caseNil {
 			continue
 		}
-		if sglist.releasetime > 0 {
-			k.releasetime = sglist.releasetime
-		}
+		
 		if sg == sglist {
-			// sg has already been dequeued by the G that woke us up.
+			// 找到命中的sudog，记录对应的索引位
 			casi = int(casei)
 			cas = k
 		} else {
+            // 不是对应的sudog，从对应通道的队列中移除
 			c = k.c
 			if k.kind == caseSend {
 				c.sendq.dequeueSudoG(sglist)
@@ -1127,14 +1098,17 @@ loop:
 				c.recvq.dequeueSudoG(sglist)
 			}
 		}
+        // 从sglist上移除
 		sgnext = sglist.waitlink
 		sglist.waitlink = nil
+        // 将其归还给缓存
 		releaseSudog(sglist)
 		sglist = sgnext
 	}
 
 	if cas == nil {
-		
+		// 通道被关闭也会唤醒所有队列中的goroutine，所以这里再跑一次上面的循环即可
+        // 便会直接走goto rclose或者goto sclose
 		goto loop
 	}
 
@@ -1146,19 +1120,8 @@ loop:
 
 	selunlock(scases, lockorder)
 	goto retc
-
+// 后面部分配合发送流程和接收流程理解一下即可，和前面描述的基本一样
 bufrecv:
-	// can receive from buffer
-	if raceenabled {
-		if cas.elem != nil {
-			raceWriteObjectPC(c.elemtype, cas.elem, cas.pc, chanrecvpc)
-		}
-		raceacquire(chanbuf(c, c.recvx))
-		racerelease(chanbuf(c, c.recvx))
-	}
-	if msanenabled && cas.elem != nil {
-		msanwrite(cas.elem, c.elemtype.size)
-	}
 	recvOK = true
 	qp = chanbuf(c, c.recvx)
 	if cas.elem != nil {
@@ -1211,9 +1174,32 @@ retc:
 	return casi, recvOK
 
 sclose:
-	// send on closed channel
+	// 向一个已关闭的channel发送值，panic
 	selunlock(scases, lockorder)
 	panic(plainError("send on closed channel"))
 }
 ```
 
+虽然上面的代码开起来很长，但是逻辑十分清晰，去掉后半段的`send`，`recv`，`close`部分，核心的处理流程就不太多了。分几步总结一下：
+
+1. 将通道为nil并且是非default类型的case设置值为`scase{}`，可以让后面的逻辑不对channel是否为空做判断。
+2. 遍历所有的case项，分四种情况进行判断。
+   - 类型是空：直接跳过。
+   - 接收类型：先判断发送队列是否为空；再判断缓冲区是否有数据；最后判断通道是否关闭。满足任一一个都直接结束循环。
+   - 发送类型：先判断通道是否关闭，已关闭，则panic；再判断接收队列是否为空；判断缓冲区是否已经满了。满足任一一个直接结束循环。
+   - default类型：不会结束循环，所以优先级最低。
+3. 在所有case都不满足的情况下，当前goroutine就会进入`waiting`状态，等待被唤醒。
+4. 唤醒后进行比对，取出对应的case索引即可。
+
+
+
+##### 总结
+
+本文对channel这一块的知识点大概的介绍了一下，包括了使用案例以及源码分析。文章略显长，其中源码占了大半部分，相信只要用心去看都会get到一部分的。
+
+
+
+##### 参考资料
+
+1. [深入理解Golang之channel](https://juejin.im/post/5decff136fb9a016544bce67)
+2. [go101-通道的介绍](https://gfw.go101.org/article/channel.html)
