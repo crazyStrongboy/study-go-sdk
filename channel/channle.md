@@ -429,7 +429,7 @@ if c.qcount < c.dataqsiz {
 }
 ```
 
-这个情况下，发送值会先进行一次拷贝到缓冲区中。然后在有接收者的情况下，会从缓冲去再拷贝一次，拷贝到接收者指定的内存地址上。在这个过程中，会先取出`qp := chanbuf(c, c.sendx)`缓冲区下一个可用的内存块，然后通过`typedmemmove(c.elemtype, qp, ep)`将值拷贝到相应的内存块中去。最后增加相应的索引位和缓冲区元素的个数。这里在满足条件的情况下会对索引位进行重置，进入下一个轮回。
+这个情况下，发送值会先进行一次拷贝到缓冲区中。然后在有接收者的情况下，会从缓冲去再拷贝一次，拷贝到接收者指定的内存地址上。在这个过程中，会先通过`qp := chanbuf(c, c.sendx)`方法取出缓冲区下一个可用的内存块，然后通过`typedmemmove(c.elemtype, qp, ep)`方法将值拷贝到相应的内存块中去。最后增加相应的索引位和缓冲区元素的个数。这里在满足条件的情况下会对索引位进行重置，进入下一个轮回。
 
 ###### 阻塞发送
 
@@ -700,3 +700,104 @@ if c.qcount > 0 {
 
 流程和上述的阻塞发送流程一致，不做过多介绍。
 
+
+
+##### 关闭
+
+简单的看一段代码
+
+```go
+func main() {
+    c := make(chan int)// line：9
+	close(c) //line：10
+}
+```
+
+通过`go tool compile -N -l -S main.go`输出其汇编代码，截取一小段观察一下：
+
+```go
+  0x0038 00056 (main.go:9)        CALL    runtime.makechan(SB)
+  0x003d 00061 (main.go:9)        PCDATA  $2, $1
+  0x003d 00061 (main.go:9)        MOVQ    16(SP), AX //将makechan返回的结果放到AX寄存器
+  0x0042 00066 (main.go:9)        MOVQ    AX, "".c+24(SP)
+  0x0047 00071 (main.go:10)       PCDATA  $2, $0
+  0x0047 00071 (main.go:10)       MOVQ    AX, (SP) //将AX寄存器中的值复制到SP（0）位置
+  0x004b 00075 (main.go:10)       CALL    runtime.closechan(SB) //调用runtime.closechan方法
+```
+
+从上面的汇编代码可以看出来，通道的关闭最终调用到了`runtime.closechan`这个方法。
+
+```go
+func closechan(c *hchan) {
+    // 关闭一个空的channel将会导致panic
+	if c == nil {
+		panic(plainError("close of nil channel"))
+	}
+
+	lock(&c.lock)
+	if c.closed != 0 {
+        // 关闭一个已关闭的channel也会导致panic
+		unlock(&c.lock)
+		panic(plainError("close of closed channel"))
+	}
+
+	if raceenabled {
+		callerpc := getcallerpc()
+		racewritepc(c.raceaddr(), callerpc, funcPC(closechan))
+		racerelease(c.raceaddr())
+	}
+	// 将closed置位1，表示当前通道已关闭
+	c.closed = 1
+
+	var glist gList
+
+	// 取出所有接收队列中的元素，将其加入到一个单向链表中
+	for {
+		sg := c.recvq.dequeue()
+		if sg == nil {
+			break
+		}
+		if sg.elem != nil {
+			typedmemclr(c.elemtype, sg.elem)
+			sg.elem = nil
+		}
+		if sg.releasetime != 0 {
+			sg.releasetime = cputicks()
+		}
+		gp := sg.g
+		gp.param = nil
+		if raceenabled {
+			raceacquireg(gp, c.raceaddr())
+		}
+		glist.push(gp)
+	}
+
+	// 取出所有发送队列中的元素，将其加入到一个单向链表中
+	for {
+		sg := c.sendq.dequeue()
+		if sg == nil {
+			break
+		}
+		sg.elem = nil
+		if sg.releasetime != 0 {
+			sg.releasetime = cputicks()
+		}
+		gp := sg.g
+		gp.param = nil
+		if raceenabled {
+			raceacquireg(gp, c.raceaddr())
+		}
+		glist.push(gp)
+	}
+	unlock(&c.lock)
+
+	// 唤醒阻塞的goroutine
+	for !glist.empty() {
+		gp := glist.pop()
+		gp.schedlink = 0
+		goready(gp, 3)
+	}
+}
+```
+
+关闭通道这一块理解起来不太难，最开始对空channel和已关闭的channel做了panic处理，后面进行资源的释放。因为处于发送队列和接收队列的goroutine都是阻塞状态的，咱们在关闭这个通道时必须得将这些goroutine都唤醒，防止goroutine泄露。
