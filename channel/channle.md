@@ -591,7 +591,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 	closed := gp.param == nil
 	gp.param = nil
 	mysg.c = nil
-    // 释放sudog
+    // 释放sudog（重新丢到p对应的缓存队列中）
 	releaseSudog(mysg)
 	return true, !closed
 }
@@ -614,7 +614,7 @@ if c.closed != 0 && c.qcount == 0 {
 }
 ```
 
-上述代码将直接返回一个对应元素类型的零值，分配零值的代码` typedmemclr(c.elemtype, ep)`，感兴趣的可以自己追踪一下。
+上述代码将直接返回一个对应元素类型的零值，分配对应元素零值的代码` typedmemclr(c.elemtype, ep)`，感兴趣的可以自己追踪一下。
 
 ###### 发送队列不为空
 
@@ -670,6 +670,17 @@ func recv(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 }
 ```
 
+这里会分两种情况进行考虑：
+
+1. 通道是unbuffered channel，则直接拷贝从发送队列中取出来的值。
+2. 通道是buffered channel，则拷贝从缓冲区中取出响应的值，并且需要将发送队列中取出来的值拷贝到对应缓冲区的位置上。
+
+![](images/sendq_not_null.png)
+
+在缓冲区是满的情况下，sendx和recvx指向同一个位置。例如上图：咱们取出recvx为2处的元素，然后会将sudog中的值拷贝到2位置处，同时sendx和recvx都指向3位置。
+
+3. 最终唤醒与当前sender sudog绑定的goroutine。
+
 ###### 缓冲区不为空
 
 ```go
@@ -695,6 +706,12 @@ if c.qcount > 0 {
     return true, true
 }
 ```
+
+直接从缓冲区中读取recvx索引位置中的值，将其拷贝大指定的指针中，然后将对应recvx处置位零值。
+
+![](images/sendq_is_null.png)
+
+如上图所示，取出索引位置为3的元素后，将其置位零值，发送者下次填充buf时就可以从index=3的位置开始填充。
 
 ###### 阻塞接收
 
