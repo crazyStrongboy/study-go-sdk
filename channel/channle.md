@@ -818,3 +818,402 @@ func closechan(c *hchan) {
 ```
 
 关闭通道这一块理解起来不太难，最开始对空channel和已关闭的channel做了panic处理，后面进行资源的释放。因为处于发送队列和接收队列的goroutine都是阻塞状态的，咱们在关闭这个通道时必须得将这些goroutine都唤醒，防止goroutine泄露。
+
+
+
+##### select-go流程
+
+###### 单case分支（包含一个default）
+
+```go
+func main() {
+	c := make(chan int)
+	close(c)
+	select {
+        case <-c://line: 11
+	default:
+	}
+}
+```
+
+使用上面的编译指令生成汇编代码如下（截取部分）：
+
+```go
+0x0050 00080 (main.go:11)       MOVQ    $0, (SP)
+0x0058 00088 (main.go:11)       PCDATA  $2, $1
+0x0058 00088 (main.go:11)       PCDATA  $0, $0
+0x0058 00088 (main.go:11)       MOVQ    "".c+24(SP), AX
+0x005d 00093 (main.go:11)       PCDATA  $2, $0
+0x005d 00093 (main.go:11)       MOVQ    AX, 8(SP)
+0x0062 00098 (main.go:11)       CALL    runtime.selectnbrecv(SB)
+```
+
+跟踪一下调用链：
+
+```go
+func selectnbrecv(elem unsafe.Pointer, c *hchan) (selected bool) {
+    // 这里不会进行阻塞，因为这里默认有个default分支，c中无法取出值的情况下默认执行default分支即可
+    // 具体实现流程参考上面的接收流程
+	selected, _ = chanrecv(c, elem, false)
+	return
+}
+```
+
+###### 单case分支（不包含default）
+
+```go
+func main() {
+	c := make(chan int)
+	close(c)
+	select {
+	case <-c:
+	}
+}
+```
+
+使用上面的编译指令生成汇编代码如下（截取部分）：
+
+```go
+0x005a 00090 (main.go:11)       MOVQ    "".c+24(SP), AX
+0x005f 00095 (main.go:11)       PCDATA  $2, $0
+0x005f 00095 (main.go:11)       MOVQ    AX, (SP)
+0x0063 00099 (main.go:11)       MOVQ    $0, 8(SP)
+0x006c 00108 (main.go:11)       CALL    runtime.chanrecv1(SB)
+```
+
+跟踪一下调用链：
+
+```go
+func chanrecv1(c *hchan, elem unsafe.Pointer) {
+    // 在从通道无法取出值的情况下，会进行阻塞当前goroutine，等待被唤醒
+    // 具体实现流程参考上面的接收流程
+	chanrecv(c, elem, true)
+}
+```
+
+
+
+###### 多case分支
+
+```go
+func main() {
+	c := make(chan int)
+	a := make(chan int)
+	close(c)
+	close(a)
+    select { //line: 13
+	case <-c:
+	case <-a:
+	default:
+
+	}
+}
+```
+
+使用上面的编译指令生成汇编代码如下（截取部分）：
+
+```go
+0x011d 00285 (main.go:13)       MOVQ    AX, (SP)
+0x0121 00289 (main.go:13)       PCDATA  $2, $1
+0x0121 00289 (main.go:13)       PCDATA  $0, $0
+0x0121 00289 (main.go:13)       MOVQ    ""..autotmp_7+88(SP), AX
+0x0126 00294 (main.go:13)       PCDATA  $2, $0
+0x0126 00294 (main.go:13)       MOVQ    AX, 8(SP)
+0x012b 00299 (main.go:13)       MOVQ    $3, 16(SP) // 表示case长度为3（包括default分支）
+0x0134 00308 (main.go:13)       CALL    runtime.selectgo(SB)
+```
+
+跟踪一下调用链：
+
+```go
+func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool) {
+	cas1 := (*[1 << 16]scase)(unsafe.Pointer(cas0))
+	order1 := (*[1 << 17]uint16)(unsafe.Pointer(order0))
+
+	scases := cas1[:ncases:ncases]
+	pollorder := order1[:ncases:ncases]
+	lockorder := order1[ncases:][:ncases:ncases]
+
+	for i := range scases {
+		cas := &scases[i]
+		if cas.c == nil && cas.kind != caseDefault {
+			*cas = scase{}
+		}
+	}
+	for i := 1; i < ncases; i++ {
+		j := fastrandn(uint32(i + 1))
+		pollorder[i] = pollorder[j]
+		pollorder[j] = uint16(i)
+	}
+
+
+	for i := 0; i < ncases; i++ {
+		j := i
+		c := scases[pollorder[i]].c
+		for j > 0 && scases[lockorder[(j-1)/2]].c.sortkey() < c.sortkey() {
+			k := (j - 1) / 2
+			lockorder[j] = lockorder[k]
+			j = k
+		}
+		lockorder[j] = pollorder[i]
+	}
+	for i := ncases - 1; i >= 0; i-- {
+		o := lockorder[i]
+		c := scases[o].c
+		lockorder[i] = lockorder[0]
+		j := 0
+		for {
+			k := j*2 + 1
+			if k >= i {
+				break
+			}
+			if k+1 < i && scases[lockorder[k]].c.sortkey() < scases[lockorder[k+1]].c.sortkey() {
+				k++
+			}
+			if c.sortkey() < scases[lockorder[k]].c.sortkey() {
+				lockorder[j] = lockorder[k]
+				j = k
+				continue
+			}
+			break
+		}
+		lockorder[j] = o
+	}
+	// lock all the channels involved in the select
+	sellock(scases, lockorder)
+
+	var (
+		gp     *g
+		sg     *sudog
+		c      *hchan
+		k      *scase
+		sglist *sudog
+		sgnext *sudog
+		qp     unsafe.Pointer
+		nextp  **sudog
+	)
+
+loop:
+	// pass 1 - look for something already waiting
+	var dfli int
+	var dfl *scase
+	var casi int
+	var cas *scase
+	var recvOK bool
+	for i := 0; i < ncases; i++ {
+		casi = int(pollorder[i])
+		cas = &scases[casi]
+		c = cas.c
+
+		switch cas.kind {
+		case caseNil:
+			continue
+
+		case caseRecv:
+			sg = c.sendq.dequeue()
+			if sg != nil {
+				goto recv
+			}
+			if c.qcount > 0 {
+				goto bufrecv
+			}
+			if c.closed != 0 {
+				goto rclose
+			}
+
+		case caseSend:
+			if raceenabled {
+				racereadpc(c.raceaddr(), cas.pc, chansendpc)
+			}
+			if c.closed != 0 {
+				goto sclose
+			}
+			sg = c.recvq.dequeue()
+			if sg != nil {
+				goto send
+			}
+			if c.qcount < c.dataqsiz {
+				goto bufsend
+			}
+
+		case caseDefault:
+			dfli = casi
+			dfl = cas
+		}
+	}
+
+	if dfl != nil {
+		selunlock(scases, lockorder)
+		casi = dfli
+		cas = dfl
+		goto retc
+	}
+
+	// pass 2 - enqueue on all chans
+	gp = getg()
+	if gp.waiting != nil {
+		throw("gp.waiting != nil")
+	}
+	nextp = &gp.waiting
+	for _, casei := range lockorder {
+		casi = int(casei)
+		cas = &scases[casi]
+		if cas.kind == caseNil {
+			continue
+		}
+		c = cas.c
+		sg := acquireSudog()
+		sg.g = gp
+		sg.isSelect = true
+		// No stack splits between assigning elem and enqueuing
+		// sg on gp.waiting where copystack can find it.
+		sg.elem = cas.elem
+		sg.releasetime = 0
+		if t0 != 0 {
+			sg.releasetime = -1
+		}
+		sg.c = c
+		// Construct waiting list in lock order.
+		*nextp = sg
+		nextp = &sg.waitlink
+
+		switch cas.kind {
+		case caseRecv:
+			c.recvq.enqueue(sg)
+
+		case caseSend:
+			c.sendq.enqueue(sg)
+		}
+	}
+
+	// wait for someone to wake us up
+	gp.param = nil
+	gopark(selparkcommit, nil, waitReasonSelect, traceEvGoBlockSelect, 1)
+
+	sellock(scases, lockorder)
+
+	gp.selectDone = 0
+	sg = (*sudog)(gp.param)
+	gp.param = nil
+
+	casi = -1
+	cas = nil
+	sglist = gp.waiting
+	// Clear all elem before unlinking from gp.waiting.
+	for sg1 := gp.waiting; sg1 != nil; sg1 = sg1.waitlink {
+		sg1.isSelect = false
+		sg1.elem = nil
+		sg1.c = nil
+	}
+	gp.waiting = nil
+
+	for _, casei := range lockorder {
+		k = &scases[casei]
+		if k.kind == caseNil {
+			continue
+		}
+		if sglist.releasetime > 0 {
+			k.releasetime = sglist.releasetime
+		}
+		if sg == sglist {
+			// sg has already been dequeued by the G that woke us up.
+			casi = int(casei)
+			cas = k
+		} else {
+			c = k.c
+			if k.kind == caseSend {
+				c.sendq.dequeueSudoG(sglist)
+			} else {
+				c.recvq.dequeueSudoG(sglist)
+			}
+		}
+		sgnext = sglist.waitlink
+		sglist.waitlink = nil
+		releaseSudog(sglist)
+		sglist = sgnext
+	}
+
+	if cas == nil {
+		
+		goto loop
+	}
+
+	c = cas.c
+
+	if cas.kind == caseRecv {
+		recvOK = true
+	}
+
+	selunlock(scases, lockorder)
+	goto retc
+
+bufrecv:
+	// can receive from buffer
+	if raceenabled {
+		if cas.elem != nil {
+			raceWriteObjectPC(c.elemtype, cas.elem, cas.pc, chanrecvpc)
+		}
+		raceacquire(chanbuf(c, c.recvx))
+		racerelease(chanbuf(c, c.recvx))
+	}
+	if msanenabled && cas.elem != nil {
+		msanwrite(cas.elem, c.elemtype.size)
+	}
+	recvOK = true
+	qp = chanbuf(c, c.recvx)
+	if cas.elem != nil {
+		typedmemmove(c.elemtype, cas.elem, qp)
+	}
+	typedmemclr(c.elemtype, qp)
+	c.recvx++
+	if c.recvx == c.dataqsiz {
+		c.recvx = 0
+	}
+	c.qcount--
+	selunlock(scases, lockorder)
+	goto retc
+
+bufsend:
+	// can send to buffer
+	....
+	typedmemmove(c.elemtype, chanbuf(c, c.sendx), cas.elem)
+	c.sendx++
+	if c.sendx == c.dataqsiz {
+		c.sendx = 0
+	}
+	c.qcount++
+	selunlock(scases, lockorder)
+	goto retc
+
+recv:
+	// can receive from sleeping sender (sg)
+	recv(c, sg, cas.elem, func() { selunlock(scases, lockorder) }, 2)
+	if debugSelect {
+		print("syncrecv: cas0=", cas0, " c=", c, "\n")
+	}
+	recvOK = true
+	goto retc
+
+rclose:
+	// read at end of closed channel
+	selunlock(scases, lockorder)
+	recvOK = false
+	if cas.elem != nil {
+		typedmemclr(c.elemtype, cas.elem)
+	}
+	goto retc
+
+send:
+	send(c, sg, cas.elem, func() { selunlock(scases, lockorder) }, 2)
+	goto retc
+
+retc:
+	return casi, recvOK
+
+sclose:
+	// send on closed channel
+	selunlock(scases, lockorder)
+	panic(plainError("send on closed channel"))
+}
+```
+
