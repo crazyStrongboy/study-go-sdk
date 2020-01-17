@@ -72,6 +72,24 @@ func (l *LinkedList) DeleteLastN(n int) {
 	slower.Next = slower.Next.Next
 }
 
+// 链表中间节点
+func (l *LinkedList) Middle() *ListNode {
+	if nil == l.Head || nil == l.Head.Next {
+		return nil
+	}
+	faster := l.Head.Next
+	if faster.Next == nil {
+		return faster
+	}
+	slower := l.Head.Next
+
+	for faster != nil && faster.Next != nil {
+		faster = faster.Next.Next
+		slower = slower.Next
+	}
+	return slower
+}
+
 func (l *ListNode) String() {
 	pl := l
 	for {

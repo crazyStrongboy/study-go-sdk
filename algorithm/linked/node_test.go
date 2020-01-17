@@ -39,3 +39,10 @@ func TestLinkedList_DeleteLastN(t *testing.T) {
 	l.DeleteLastN(2)
 	l.Head.String()
 }
+
+func TestLinkedList_Middle(t *testing.T) {
+	//n1 := &ListNode{Value: "1"}
+	//l = &LinkedList{Head: &ListNode{Next: n1}}
+	middle := l.Middle()
+	fmt.Println(middle.Value)
+}
