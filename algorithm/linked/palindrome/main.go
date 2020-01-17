@@ -11,7 +11,7 @@ import (
 */
 
 func main() {
-	s := "我爱爱你"
+	s := "我爱爱我"
 	rs := []rune(s)
 	l := linked.ConvertToList(rs)
 	l.String()
