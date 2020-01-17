@@ -51,6 +51,27 @@ func (l *LinkedList) HasCycle() bool {
 	return false
 }
 
+// 删除倒数第几个元素（faster比slower多走n步）
+func (l *LinkedList) DeleteLastN(n int) {
+	if n <= 0 || nil == l.Head || nil == l.Head.Next {
+		return
+	}
+	faster := l.Head.Next
+	for i := 1; i <= n && faster != nil; i++ {
+		faster = faster.Next
+	}
+	// n已经大于等于l的长度了
+	if faster == nil {
+		return
+	}
+	slower := l.Head.Next
+	for faster.Next != nil {
+		faster = faster.Next
+		slower = slower.Next
+	}
+	slower.Next = slower.Next.Next
+}
+
 func (l *ListNode) String() {
 	pl := l
 	for {

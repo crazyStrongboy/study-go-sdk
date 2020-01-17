@@ -34,3 +34,8 @@ func TestLinkedList_HasCycle(t *testing.T) {
 	isCycle := l.HasCycle()
 	fmt.Println("isCycle: ", isCycle)
 }
+
+func TestLinkedList_DeleteLastN(t *testing.T) {
+	l.DeleteLastN(2)
+	l.Head.String()
+}
