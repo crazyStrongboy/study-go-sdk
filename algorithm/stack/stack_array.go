@@ -21,3 +21,7 @@ func (s *ArrayStack) Pop() (value interface{}) {
 	s.arr = s.arr[:len(s.arr)-1]
 	return
 }
+
+func (s *ArrayStack) Reset() {
+	s.arr = s.arr[:0]
+}

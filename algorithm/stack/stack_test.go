@@ -45,3 +45,11 @@ func TestLinkedStack(t *testing.T) {
 	fmt.Println(stack.Pop())
 	fmt.Println(stack.Pop())
 }
+
+func TestValidator_Check(t *testing.T) {
+	v := NewValidator()
+	f := v.Check("[{}()]")
+	fmt.Println("check result: ", f)
+	f = v.Check("[[{}()]")
+	fmt.Println("check result: ", f)
+}
