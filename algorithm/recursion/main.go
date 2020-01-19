@@ -28,6 +28,6 @@ func f(n int) int {
 		return r
 	}
 	ret := f(n-1) + f(n-2)
-	c[n] = ret
+	c[n] = ret // 避免重复计算
 	return ret
 }
