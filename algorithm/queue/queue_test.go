@@ -23,3 +23,16 @@ func TestArrayQueue(t *testing.T) {
 		fmt.Println(queue.Dequeue())
 	}
 }
+
+func TestCycleQueue(t *testing.T) {
+	queue := NewCycleQueue(4)
+	for i := 0; i < 5; i++ {
+		ret := queue.Enqueue(i)
+		fmt.Printf("i： %d,ret: %t\n", i, ret)
+	}
+
+	for i := 0; i < 4; i++ {
+		fmt.Println(queue.Dequeue())
+		queue.Enqueue(i + 10)
+	}
+}
