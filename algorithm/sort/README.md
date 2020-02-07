@@ -8,3 +8,5 @@
 快速排序分区partition的思想：
 
 ![img](https://static001.geekbang.org/resource/image/08/e7/086002d67995e4769473b3f50dd96de7.jpg)
+
+5. 堆排序

@@ -86,3 +86,42 @@ func swap(arr []int, i, j int) {
 	arr[i] = arr[j]
 	arr[j] = tmp
 }
+
+// 堆排序
+func HeapSort(arr []int) {
+	// 建堆
+	buildHeap(arr)
+	// 取出1位置元素放到最后一个，对前面的n-1个元素重新建堆，直到只有一个元素为止
+	n := len(arr) - 1
+	for n > 1 {
+		swap(arr, 1, n)
+		n--
+		heapify(arr, 1, n)
+	}
+}
+
+// 建堆
+func buildHeap(arr []int) {
+	n := len(arr)
+	for i := n / 2; i >= 1; i-- {
+		heapify(arr, i, len(arr)-1)
+	}
+}
+
+// 堆化
+func heapify(arr []int, i, n int) {
+	for {
+		max := i
+		if i*2 <= n && arr[max] < arr[i*2] {
+			max = i * 2
+		}
+		if i*2+1 <= n && arr[max] < arr[i*2+1] {
+			max = i*2 + 1
+		}
+		if max == i {
+			break
+		}
+		swap(arr, i, max)
+		i = max
+	}
+}

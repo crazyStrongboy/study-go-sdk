@@ -27,3 +27,9 @@ func TestQuickAscSort(t *testing.T) {
 	QuickAscSort(arr)
 	fmt.Println(arr)
 }
+
+func TestHeapSort(t *testing.T) {
+	arr := []int{0, 8, 5, 1, 9, 3}
+	HeapSort(arr)
+	fmt.Println(arr)
+}
