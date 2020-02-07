@@ -11,7 +11,7 @@ import (
 */
 
 func TestInsertAscSort(t *testing.T) {
-	arr := []int{2, 5, 1, 9}
+	arr := []int{6, 5, 1, 9}
 	InsertAscSort(arr)
 	fmt.Println(arr)
 }
@@ -19,5 +19,11 @@ func TestInsertAscSort(t *testing.T) {
 func TestBubbleAscSort(t *testing.T) {
 	arr := []int{2, 5, 1, 9}
 	BubbleAscSort(arr)
+	fmt.Println(arr)
+}
+
+func TestQuickAscSort(t *testing.T) {
+	arr := []int{8, 5, 1, 9, 3}
+	QuickAscSort(arr)
 	fmt.Println(arr)
 }

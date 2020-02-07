@@ -20,10 +20,12 @@ func InsertAscSort(arr []int) {
 				break
 			}
 		}
+		// 空出来的那一个位置，把value填进去
 		arr[j+1] = value
 	}
 }
 
+// 冒泡排序
 func BubbleAscSort(arr []int) {
 	if len(arr) <= 1 {
 		return
@@ -43,4 +45,44 @@ func BubbleAscSort(arr []int) {
 			break // 没有数据交换，提前退出
 		}
 	}
+}
+
+// 快速排序
+func QuickAscSort(arr []int) {
+	if len(arr) <= 1 {
+		return
+	}
+	quickAscSort(arr, 0, len(arr)-1)
+}
+
+// 进行快速排序
+func quickAscSort(arr []int, start int, end int) {
+	if start >= end {
+		return
+	}
+	mid := partition(arr, start, end)
+	quickAscSort(arr, start, mid-1)
+	quickAscSort(arr, mid+1, end)
+}
+
+// 获取分区索引
+func partition(arr []int, start int, end int) int {
+	// 取end节点为分区节点，小于它的排在它左边，大于它的排在它右边，原地排序
+	v := arr[end]
+	j := start
+	for i := start; i < end; i++ {
+		if arr[i] < v {
+			swap(arr, i, j)
+			j++
+		}
+	}
+	swap(arr, j, end)
+	return j
+}
+
+// 交换数组中的两个元素
+func swap(arr []int, i, j int) {
+	tmp := arr[i]
+	arr[i] = arr[j]
+	arr[j] = tmp
 }
