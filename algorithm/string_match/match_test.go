@@ -11,3 +11,10 @@ func Test_bf_match(t *testing.T) {
 	match := bf_match(origin, sub)
 	fmt.Println("match: ", match)
 }
+
+func Test_rk_match(t *testing.T) {
+	origin := "abcdfg"
+	sub := "bd"
+	match := rk_match(origin, sub)
+	fmt.Println("match: ", match)
+}
