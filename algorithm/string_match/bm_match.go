@@ -12,12 +12,12 @@ func bm_match(origin, sub string) bool {
 	i := 0
 	for i <= len(origin)-len(sub) {
 		j := 0
-		for j = len(sub) - 1; j > 0; j-- {
+		for j = len(sub) - 1; j >= 0; j-- {
 			if origin[i+j] != sub[j] {
 				break
 			}
 		}
-		if j <= 0 {
+		if j < 0 {
 			return true
 		}
 		i += j - bc[origin[i+j]]
