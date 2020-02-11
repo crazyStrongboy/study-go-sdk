@@ -28,7 +28,7 @@ func getNext(sub string) []int {
 	k := -1
 	for i := 1; i < l; i++ {
 		for k != -1 && sub[i] != sub[k+1] {
-			k = next[k]
+			k = next[k] //想象成对称结构即可，找到次长匹配前缀子串
 		}
 		if sub[k+1] == sub[i] {
 			k++
