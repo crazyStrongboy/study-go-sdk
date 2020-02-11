@@ -7,7 +7,7 @@ import (
 
 func Test_bm_match(t *testing.T) {
 	origin := "abcdfg"
-	sub := "dg"
+	sub := "df"
 	match := bm_match(origin, sub)
 	fmt.Println("match: ", match)
 }
