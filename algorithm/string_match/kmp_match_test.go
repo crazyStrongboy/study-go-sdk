@@ -7,7 +7,7 @@ import (
 
 func Test_kmp_match(t *testing.T) {
 	origin := "acbbcabcbc"
-	sub := "abcbd"
+	sub := "abacdababc"
 	match := kmp_match(origin, sub)
 	fmt.Println("match: ", match)
 }
