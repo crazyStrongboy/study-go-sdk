@@ -30,7 +30,7 @@ type hmap struct {
 }
 ```
 
-![1583236510135](C:\Users\hejun\AppData\Roaming\Typora\typora-user-images\1583236510135.png)
+![empty](http://images.hcyhj.cn/blogimages/map/bucket.png)
 
 
 
@@ -134,7 +134,7 @@ bucketloop:
 			val = add(unsafe.Pointer(b), dataOffset+bucketCnt*uintptr(t.keysize)+i*uintptr(t.valuesize))
 			goto done
 		}
-        // 当前桶已经没有存储数据的位置了，则需要从overflow预分配桶中查询位置
+        // 当前桶已经没有存储数据的位置了，则需要从overflow溢出桶中查询位置
 		ovf := b.overflow(t)
 		if ovf == nil {
 			break
@@ -148,7 +148,7 @@ bucketloop:
 	}
 
 	if inserti == nil {
-		// 所有的当前桶都是满的，需要构建一个新的预分配桶
+		// 所有的当前桶都是满的，需要构建一个新的溢出桶
 		newb := h.newoverflow(t, b)
 		inserti = &newb.tophash[0]
 		insertk = add(unsafe.Pointer(newb), dataOffset)
@@ -186,7 +186,7 @@ done:
 
 ```
 
-![map-bucket](D:\工作存档\visio\map-bucket.png)
+![empty](http://images.hcyhj.cn/blogimages/map/map-bucket.png)
 
 结合上面这张图，咱们举个简单的例子，假设hash(key)之后定位到了1号桶，然后高8位的值为top，那么咱们就会遍历1号桶对应的tophash去查询对应的地址。用简单的伪代码表现为：
 
@@ -257,7 +257,7 @@ bucketloop:
 
 ```
 
-
+获取数据代码看起来是最容易懂的，首先定位到桶的位置，然后遍历该桶的tophash，查询key对应的位置，当前桶查询不到则继续在其溢出桶中进行递归检索即可。
 
 
 
@@ -369,6 +369,14 @@ search:
 
 ```
 
+删除数据的逻辑不是很复杂，但是里面对tophash中的状态进行了置换，增加了阅读代码的复杂度。这里主要是emptyOne和emptyRest这两个状态的转化，里面有几个临界点，下面一一说明：
+
+1. 当前删除元素是tophash中的最后一个元素，则需要检查它的下一个溢出桶tophash的第一个元素是否是emptyRest。如果不是，则直接return。
+2. 当前删除元素不是tophash中的最后一个元素，则检查当前tophash的下一个元素是否是emptyRest即可。如果不是，则直接return。
+3. 前两个条件都不满足的情况下，则需要将当前位置置为emptyRest，同时还要检测它前面的emptyOne状态的元素，将其均置为emptyRest，如下图所示：
+
+![empty](http://images.hcyhj.cn/blogimages/map/empty.png)
+
 
 
 ### 扩容
@@ -376,8 +384,55 @@ search:
 扩容的触发点在`mapassign`这个过程中，它主要检测了两个阈值：
 
 1. 达到了负载因子的上限，数量超过了6.5*bucket_num。这时候说明大部分的桶可能都快满了，如果插入新元素，有大概率需要挂在 overflow 的桶上。
-2. 溢出桶的数量过多。
+2. 溢出桶的数量过多。例如频繁的删除操作，导致溢出桶中很多位置都是emptyOne。
+
+
+
+```go
+func hashGrow(t *maptype, h *hmap) {
+	bigger := uint8(1)
+	if !overLoadFactor(h.count+1, h.B) {
+        // 这里表示是溢出桶数量数量过多，但是map中元素数量还达不到过载，则无需增长桶数量
+        // 分配一个与之前一样的即可，将所有数据摊平，减少溢出桶的数量
+		bigger = 0
+		h.flags |= sameSizeGrow
+	}
+	oldbuckets := h.buckets
+	newbuckets, nextOverflow := makeBucketArray(t, h.B+bigger, nil)
+
+	flags := h.flags &^ (iterator | oldIterator)
+	if h.flags&iterator != 0 {
+		flags |= oldIterator
+	}
+	// commit the grow (atomic wrt gc)
+	h.B += bigger
+	h.flags = flags
+	h.oldbuckets = oldbuckets
+	h.buckets = newbuckets
+	h.nevacuate = 0
+	h.noverflow = 0
+
+	if h.extra != nil && h.extra.overflow != nil {
+		// Promote current overflow buckets to the old generation.
+		if h.extra.oldoverflow != nil {
+			throw("oldoverflow is not nil")
+		}
+		h.extra.oldoverflow = h.extra.overflow
+		h.extra.overflow = nil
+	}
+	if nextOverflow != nil {
+		if h.extra == nil {
+			h.extra = new(mapextra)
+		}
+		h.extra.nextOverflow = nextOverflow
+	}
+    // 实际的拷贝并不是在此处进行，而是在growWork() and evacuate()时自动进行的。
+}
+
+```
+
+
 
 ### 总结
 
-在增加、查询、删除这几个操作中，其实有很多共性的地方，比如都需要先定位桶的位置，然后通过其hash值的高8位去tophash中查询是否有与此值匹配的位置存在，查询不到，则去overflow溢出桶的tophash中继续查询即可。只不过在其中做了很多逻辑判断和业务上的一些优化以及扩容处理，这样让代码看起来你略显复杂，咱们将问题拆解，再一步步去看，便会简单许多。
+在增加、查询、删除这几个操作中，其实有很多共性的地方，比如都需要先定位桶的位置，然后通过其hash值的高8位去tophash中查询是否有与此值匹配的位置存在，查询不到，则去overflow溢出桶的tophash中继续查询即可。只不过在其中做了很多逻辑判断和业务上的一些优化以及扩缩容处理，这样让代码看起来你略显复杂，咱们将问题拆解，再一步步去看，便会简单许多。
