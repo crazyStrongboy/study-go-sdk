@@ -2,7 +2,7 @@
 
 
 
-### 基本结构
+### 数据结构
 
 ```go
 type maptype struct {
@@ -36,6 +36,17 @@ type hmap struct {
 
 ```go
 const(
+    bucketCntBits = 3  
+    bucketCnt     = 1 << bucketCntBits // 一个 bucket 最多能放的元素数
+
+    // load factor = 13/2
+    loadFactorNum = 13
+    loadFactorDen = 2
+
+    // 超过这两个 size 的对应对象，会被转为指针
+    maxKeySize   = 128
+    maxValueSize = 128
+    
 	emptyRest      = 0 // tophash对应的位置为空，并且后续没有非空的值
 	emptyOne       = 1 // tophash对应的位置为空，元素被删除后可能的标记值
 	evacuatedX     = 2 // key/value是无效的，值被迁移到新table的前半段
@@ -63,9 +74,18 @@ type bmap struct {
 
 
 
-### 创建
+### 初始化
+
+当`make(map[k]v,hint)`,hint<8时，则会调用`makemap_small`来进行map的初始化，当hint>8时，则会调用`makemap`进行初始化。
 
 ```go
+// hint < 8
+func makemap_small() *hmap {
+	h := new(hmap)
+	h.hash0 = fastrand()
+	return h
+}
+// hint > 8
 func makemap(t *maptype, hint int, h *hmap) *hmap {
 	mem, overflow := math.MulUintptr(uintptr(hint), t.bucket.size)
 	if overflow || mem > maxAlloc {
@@ -86,7 +106,7 @@ func makemap(t *maptype, hint int, h *hmap) *hmap {
 	}
 	h.B = B
 
-	
+	// 如果B=0,则在添加数据的时候进行初始化分配内存
 	if h.B != 0 {
 		var nextOverflow *bmap
 		h.buckets, nextOverflow = makeBucketArray(t, h.B, nil)
