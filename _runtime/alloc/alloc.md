@@ -5,13 +5,14 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	if gcphase == _GCmarktermination {
 		throw("mallocgc called with gcphase == _GCmarktermination")
 	}
-
+	// 对0尺寸的对象进行快速分配，返回的都是同一个全局对象
 	if size == 0 {
 		return unsafe.Pointer(&zerobase)
 	}
 
-	// assistG is the G to charge for this allocation, or nil if
-	// GC is not currently active.
+	// _GCoff=0，GC没有运行
+    // _GCmark=1，GC正在进行标记工作
+    // _GCmarktermination=2，GC已经结束
 	var assistG *g
 	if gcBlackenEnabled != 0 {
 		// Charge the current user G for this allocation.
@@ -84,16 +85,20 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 			size = maxTinySize
 		} else {
 			var sizeclass uint8
+            // 计算出一个合适的span size
 			if size <= smallSizeMax-8 {
 				sizeclass = size_to_class8[(size+smallSizeDiv-1)/smallSizeDiv]
 			} else {
 				sizeclass = size_to_class128[(size-smallSizeMax+largeSizeDiv-1)/largeSizeDiv]
 			}
 			size = uintptr(class_to_size[sizeclass])
+            // 得到具体span的索引
 			spc := makeSpanClass(sizeclass, noscan)
 			span := c.alloc[spc]
+            // 进行快速分配
 			v := nextFreeFast(span)
 			if v == 0 {
+                // 当前尺寸的span已经用完了，可能需要重新填充
 				v, span, shouldhelpgc = c.nextFree(spc)
 			}
 			x = unsafe.Pointer(v)
@@ -105,6 +110,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		var s *mspan
 		shouldhelpgc = true
 		systemstack(func() {
+            // 进行大size的分配
 			s = largeAlloc(size, needzero, noscan)
 		})
 		s.freeindex = 1
@@ -182,7 +188,26 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 }
 ```
 
-### nextFreeFast
+
+
+### makeSpanClass
+
+下图是`mcache`中alloc数组对应的结构，一共有67种规格的span,然后有scan和noscan两种类型，则一共是134个。
+
+![](http://images.hcyhj.cn/blogimages/mallocgc/mcache_alloc.png)
+
+```go
+// 如果noscan = true
+// 例如sizeClass=2,那么对于的spanClass = 2*2 + 1 = 5
+// 上述例子可得16字节的noscan类型的span
+func makeSpanClass(sizeclass uint8, noscan bool) spanClass {
+	return spanClass(sizeclass<<1) | spanClass(bool2int(noscan))
+}
+```
+
+
+
+### mspan.nextFreeFast
 
 ```go
 func nextFreeFast(s *mspan) gclinkptr {
@@ -204,7 +229,65 @@ func nextFreeFast(s *mspan) gclinkptr {
 }
 ```
 
-### nextFree
+
+
+### mspan.nextFreeIndex
+
+```go
+func (s *mspan) nextFreeIndex() uintptr {
+	sfreeindex := s.freeindex
+	snelems := s.nelems
+	if sfreeindex == snelems {
+		return sfreeindex
+	}
+	if sfreeindex > snelems {
+		throw("s.freeindex > s.nelems")
+	}
+
+	aCache := s.allocCache
+
+	bitIndex := sys.Ctz64(aCache)
+	for bitIndex == 64 {
+		// Move index to start of next cached bits.
+		sfreeindex = (sfreeindex + 64) &^ (64 - 1)
+		if sfreeindex >= snelems {
+			s.freeindex = snelems
+			return snelems
+		}
+		whichByte := sfreeindex / 8
+		// Refill s.allocCache with the next 64 alloc bits.
+		s.refillAllocCache(whichByte)
+		aCache = s.allocCache
+		bitIndex = sys.Ctz64(aCache)
+		// nothing available in cached bits
+		// grab the next 8 bytes and try again.
+	}
+	result := sfreeindex + uintptr(bitIndex)
+	if result >= snelems {
+		s.freeindex = snelems
+		return snelems
+	}
+
+	s.allocCache >>= uint(bitIndex + 1)
+	sfreeindex = result + 1
+
+	if sfreeindex%64 == 0 && sfreeindex != snelems {
+		// We just incremented s.freeindex so it isn't 0.
+		// As each 1 in s.allocCache was encountered and used for allocation
+		// it was shifted away. At this point s.allocCache contains all 0s.
+		// Refill s.allocCache so that it corresponds
+		// to the bits at s.allocBits starting at s.freeindex.
+		whichByte := sfreeindex / 8
+		s.refillAllocCache(whichByte)
+	}
+	s.freeindex = sfreeindex
+	return result
+}
+```
+
+
+
+### mcache.nextFree
 
 ```go
 func (c *mcache) nextFree(spc spanClass) (v gclinkptr, s *mspan, shouldhelpgc bool) {
@@ -267,7 +350,7 @@ func largeAlloc(size uintptr, needzero bool, noscan bool) *mspan {
 }
 ```
 
-### heap.alloc
+### mheap.alloc
 
 ```go
 func (h *mheap) alloc(npage uintptr, spanclass spanClass, large bool, needzero bool) *mspan {
@@ -289,7 +372,7 @@ func (h *mheap) alloc(npage uintptr, spanclass spanClass, large bool, needzero b
 }
 ```
 
-### heap.alloc_m
+### mheap.alloc_m
 
 ```go
 func (h *mheap) alloc_m(npage uintptr, spanclass spanClass, large bool) *mspan {
@@ -356,7 +439,7 @@ func (h *mheap) alloc_m(npage uintptr, spanclass spanClass, large bool) *mspan {
 }
 ```
 
-### heap.allocSpanLocked
+### mheap.allocSpanLocked
 
 ```go
 func (h *mheap) allocSpanLocked(npage uintptr, stat *uint64) *mspan {
@@ -434,7 +517,7 @@ HaveSpan:
 }
 ```
 
-### pickFreeSpan
+### mheap.pickFreeSpan
 
 ```go
 func (h *mheap) pickFreeSpan(npage uintptr) *mspan {
@@ -456,7 +539,7 @@ func (h *mheap) pickFreeSpan(npage uintptr) *mspan {
 }
 ```
 
-### heap.grow
+### mheap.grow
 
 ```go
 func (h *mheap) grow(npage uintptr) bool {
