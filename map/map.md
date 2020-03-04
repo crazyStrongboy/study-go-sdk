@@ -1,10 +1,11 @@
 ### 前言
 
-
+一般的map都是采用数组+链表的数据结构去进行数据存储，在单节点挂载数据过多时，会考虑将链表转换成树结构来提高效率。那么GO语言的map是怎样实现的呢？有用到树结构吗？在动态扩缩容时又是怎样进行数据迁移的呢？咱们带着这几个问题去了解一下下面的内容。
 
 ### 数据结构
 
 ```go
+// map的类型
 type maptype struct {
 	typ        _type
 	key        *_type // 键的类型
@@ -72,11 +73,52 @@ type bmap struct {
 
 ![empty](http://images.hcyhj.cn/blogimages/map/bucket.png)
 
+```go
+func Test_f(t *testing.T) {
+	//m := map[int]string{} // runtime.makemap
+	m := make(map[int]string,16)
+	m[1] = "test"
+	fmt.Println(m)
+}
+```
+
+经过简单的编译`go tool compile -N -l -S map_test.go`后，可以在里面发现这样一段信息：
+
+```go
+type.noalg.map.bucket[int]string SRODATA dupok size=176
+        rel 24+8 t=1 runtime.algarray+0
+        rel 32+8 t=1 runtime.gcbits.00aaaa02+0
+        rel 40+4 t=5 type..namedata.*map.bucket[int]string-+0
+        rel 44+4 t=6 type.*map.bucket[int]string+0
+        rel 48+8 t=1 type..importpath..+0
+        rel 56+8 t=1 type.noalg.map.bucket[int]string+80
+        rel 80+8 t=1 type..namedata.topbits-+0
+        rel 88+8 t=1 type.[8]uint8+0
+        rel 104+8 t=1 type..namedata.keys-+0
+        rel 112+8 t=1 type.noalg.[8]int+0
+        rel 128+8 t=1 type..namedata.values-+0
+        rel 136+8 t=1 type.noalg.[8]string+0
+        rel 152+8 t=1 type..namedata.overflow-+0
+        rel 160+8 t=1 type.*map.bucket[int]string+0
+
+```
+
+从上面的信息可以看出
+
+- bmap类型为`[8]uint8`
+- keys类型为`[8]int`
+- value类型为`[8]string`
+- overflow类型为`map.bucket[int]string`的一个指针
+
+
+
+> PS：看源码时最好将功能性代码拆开去阅读，比如扩容内容和增、删、查都可以拆开单独去理解，在都能想通的情况下再整合到一起，这样会比较轻松一点。
+
 
 
 ### 初始化
 
-当`make(map[k]v,hint)`,hint<8时，则会调用`makemap_small`来进行map的初始化，当hint>8时，则会调用`makemap`进行初始化。
+当`make(map[k]v,hint)`,hint<8时，会调用`makemap_small`来进行map的初始化；当hint>8时，则会调用`makemap`进行初始化。
 
 ```go
 // hint < 8
@@ -179,6 +221,7 @@ func mapassign(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
 	// 设置一个标记，防止并发写，后面会检测这个标记
 	h.flags ^= hashWriting
 
+    // 懒初始化，在前面初始化map时，B为0，桶数组放到这里来进行初始化
 	if h.buckets == nil {
 		h.buckets = newobject(t.bucket) // newarray(t.bucket, 1)
 	}
@@ -238,7 +281,9 @@ bucketloop:
 		}
 		b = ovf
 	}
-    // 扩容触发点
+    // 扩容触发点，下面俩满足一个就行：
+    // 1. map中数据量超过了6.5*桶数量
+    // 2. 溢出桶数量过多
     if !h.growing() && (overLoadFactor(h.count+1, h.B) || tooManyOverflowBuckets(h.noverflow, h.B)) {
 		hashGrow(t, h)
 		goto again // Growing the table invalidates everything, so try again
@@ -296,7 +341,7 @@ loop:
         if tophash[i] == empty{
             return &bucket+tophash_size+8*key_size+i*value_size  
         }
-        //前面都没找到，则要去预留桶中去找位置,继续循环预留桶中的tophash
+        //前面都没找到，则要去溢出桶中去找位置,继续循环溢出桶中的tophash
         tophash = overflowBucket.tophash
         goto loop
     }
@@ -365,7 +410,7 @@ bucketloop:
 
 ```
 
-获取数据代码看起来是最容易懂的，首先定位到桶的位置，然后遍历该桶的tophash，查询key对应的位置，当前桶查询不到则继续在其溢出桶中进行递归检索即可。当然这个里面对扩容那一块做了特殊处理，这个也就是在定位桶的位置处有点细微差别而已。
+获取数据代码相对来说比较简单点，首先定位到桶的位置，然后遍历该桶的tophash，查询key对应的位置，当前桶查询不到则继续在其溢出桶中进行递归检索即可。当然这里对扩容那一块做了特殊处理，也就是在定位桶的位置处有点细微差别而已。
 
 
 
@@ -379,6 +424,7 @@ func mapdelete(t *maptype, h *hmap, key unsafe.Pointer) {
 		}
 		return
 	}
+    // 检测是否有并发写
 	if h.flags&hashWriting != 0 {
 		throw("concurrent map writes")
 	}
@@ -392,6 +438,7 @@ func mapdelete(t *maptype, h *hmap, key unsafe.Pointer) {
 	bucket := hash & bucketMask(h.B)
     
     if h.growing() {
+        // 进行扩容
 		growWork(t, h, bucket)
 	}
 
@@ -415,7 +462,7 @@ search:
 			if !alg.equal(key, k2) {
 				continue
 			}
-			// Only clear key if there are pointers in it.
+			// key是指针的需要置空，方便GC
 			if t.indirectkey() {
 				*(*unsafe.Pointer)(k) = nil
 			} else if t.key.kind&kindNoPointers == 0 {
@@ -491,8 +538,8 @@ search:
 
 扩容的触发点在`mapassign`这个过程中，它主要检测了两个阈值：
 
-1. 达到了负载因子的上限，数量超过了6.5*bucket_num。这时候说明大部分的桶可能都快满了，如果插入新元素，有大概率需要挂在 overflow 的桶上。
-2. 溢出桶的数量过多。例如频繁的删除操作，导致溢出桶中很多位置都是emptyOne。
+1. 达到了负载因子的上限，**数量超过了6.5乘以bucket_num**。这时候说明大部分的桶可能都快满了，如果插入新元素，有大概率需要挂在 overflow 的桶上。
+2. 溢出桶的数量过多。例如频繁的删除操作，**导致溢出桶中很多位置都是emptyOne**。
 
 
 
@@ -543,7 +590,7 @@ func hashGrow(t *maptype, h *hmap) {
 
 ```go
 func growWork(t *maptype, h *hmap, bucket uintptr) {
-	// 要确保我们迁移的通和咱们目前用的通是一致的
+	// 要确保我们迁移的桶和当前用的桶是一致的
 	evacuate(t, h, bucket&h.oldbucketmask())
 
 	// 进行辅助迁移，当前桶迁移完成查看map是否还在扩容过程中，并帮助进行迁移
@@ -557,7 +604,7 @@ func evacuate(t *maptype, h *hmap, oldbucket uintptr) {
 	b := (*bmap)(add(h.oldbuckets, oldbucket*uintptr(t.bucketsize)))
 	newbit := h.noldbuckets()
 	if !evacuated(b) {
-		// 这里分为X区和Y取，即地位区和高位区，扩容之后桶容量翻倍，需要把原有数据
+		// 这里分为X区和Y取，即低位区和高位区，扩容之后桶容量翻倍，需要把原有数据
         // 均匀的分散在这两个区域
 		var xy [2]evacDst
 		x := &xy[0]
@@ -608,7 +655,7 @@ func evacuate(t *maptype, h *hmap, oldbucket uintptr) {
 						useY = top & 1 // 保证这个key有一半的几率落到Y区，随机发配
 						top = tophash(hash)
 					} else {
-                        // 例如newbit=8即1000，如果hash&1000!=0,则第四位必须不为0
+                        // 例如newbit=8，其二进制即1000，如果hash&1000!=0,则第四位必须不为0
                         // 即xxxx1xxx，则在翻倍扩容后，桶位置肯定是oldsize+hash
 						if hash&newbit != 0 {
 							useY = 1
@@ -692,8 +739,12 @@ func advanceEvacuationMark(h *hmap, t *maptype, newbit uintptr) {
 
 ```
 
+在做数据迁移时，关注三个点即可：
 
+1. 对于那些相同的key在多次hash计算时得出的值不一样的情况下，随机找个bucket进行置放即可。
+2. 将桶中的其他原有数据通过合理的计算散布在新桶的高低位区。它这里取巧了一点，通过计算`hash&newbit != 0`，则证明该数据应该被分配到高位区，具体的解释在上面代码的注释上有。
+3. 当前桶已经迁移完成，判断是否需要进行辅助其他桶的迁移。
 
 ### 总结
 
-在增加、查询、删除这几个操作中，其实有很多共性的地方，比如都需要先定位桶的位置，然后通过其hash值的高8位去`tophash`中查询是否有与此值匹配的位置存在，查询不到，则去`overflow`溢出桶的`tophash`中继续查询即可。只不过在其中做了很多逻辑判断和业务上的一些优化以及扩缩容处理，这样让代码看起来你略显复杂，咱们将问题拆解，再一步步去看，便会简单许多。
+在增加、查询、删除这几个操作中，其实有很多共性的地方，比如都需要先定位桶的位置，然后通过其hash值的高8位去`tophash`中查询是否有与此值匹配的位置存在，查询不到，则去`overflow`溢出桶的`tophash`中继续查询即可。只不过在其中做了很多逻辑判断和业务上的一些优化以及扩缩容处理，这样让代码看起来你略显复杂，咱们将问题拆解，再一步步去看，便会简单许多。从上面的分析也可以很清楚的了解到，go-map完全采用的是数组+链表的数据结构，数据量增大时，也并没有和其他语言一样将链表转换成树结构。
