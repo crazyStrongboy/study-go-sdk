@@ -1,3 +1,29 @@
+
+
+
+
+
+
+```go
+// A _defer holds an entry on the list of deferred calls.
+// If you add a field here, add code to clear it in freedefer.
+type _defer struct {
+	siz     int32
+	started bool
+	sp      uintptr // sp at time of defer
+	pc      uintptr
+	fn      *funcval
+	_panic  *_panic // panic that is running defer
+	link    *_defer
+}
+```
+
+
+
+
+
+
+
 ```go
 func deferproc(siz int32, fn *funcval) { // arguments of fn follow fn
 	if getg().m.curg != getg() {
@@ -207,10 +233,16 @@ TEXT runtime·jmpdefer(SB), NOSPLIT, $0-16
 	MOVQ	fv+0(FP), DX	// fn
 	MOVQ	argp+8(FP), BX	// caller sp
 	LEAQ	-8(BX), SP	// caller sp after CALL
-	MOVQ	-8(SP), BP	// restore BP as if deferreturn returned (harmless if framepointers not in use)
+	MOVQ	-8(SP), BP	// 
 	SUBQ	$5, (SP)	// return to CALL again
 	MOVQ	0(DX), BX
 	JMP	BX	// but first run the deferred function
 
 ```
+
+
+
+
+
+
 
