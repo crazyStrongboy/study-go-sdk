@@ -8,7 +8,7 @@ package string_match
 // BF算法进行匹配
 func bf_match(origin, sub string) bool {
 outer:
-	for i := 0; i < len(origin)-len(sub); i++ {
+	for i := 0; i <= len(origin)-len(sub); i++ {
 		for j := 0; j < len(sub); j++ {
 			if sub[j] != origin[i+j] {
 				continue outer
