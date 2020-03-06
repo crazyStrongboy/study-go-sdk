@@ -24,6 +24,12 @@ type _defer struct {
 
 
 
+
+
+
+
+
+
 ```go
 func deferproc(siz int32, fn *funcval) { // arguments of fn follow fn
 	if getg().m.curg != getg() {
@@ -140,7 +146,6 @@ func deferreturn(arg0 uintptr) {
 	if d.sp != sp {
 		return
 	}
-
 	// Moving arguments around.
 	//
 	// Everything called after this point must be recursively
