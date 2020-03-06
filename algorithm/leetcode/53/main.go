@@ -19,7 +19,7 @@ import "fmt"
 */
 
 func main() {
-	max := maxSubArray([]int{-2, 1, -3, 4, -1, 2, 1, -5, 4})
+	max := maxSubArray1([]int{-2, 1, -3, 4, -1, 2, 1, -5, 4})
 	fmt.Println(max)
 }
 
@@ -41,4 +41,24 @@ func maxSubArray(nums []int) int {
 		}
 	}
 	return max
+}
+
+// 动态规划
+func maxSubArray1(nums []int) int {
+	n := len(nums)
+	maxNum := nums[0]
+	for i := 1; i < n; i++ {
+		if nums[i-1] > 0 {
+			nums[i] += nums[i-1]
+		}
+		maxNum = max(nums[i], maxNum)
+	}
+	return maxNum
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
