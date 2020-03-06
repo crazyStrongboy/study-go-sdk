@@ -53,3 +53,15 @@ func removeElement(nums []int, val int) int {
 	}
 	return i
 }
+
+// 采用快慢指针的方式
+func removeElement1(nums []int, val int) int {
+	i := 0
+	for j := 0; j < len(nums); j++ {
+		if nums[j] != val {
+			nums[i] = nums[j]
+			i++
+		}
+	}
+	return i
+}
