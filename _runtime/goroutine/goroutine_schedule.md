@@ -120,15 +120,6 @@ func execute(gp *g, inheritTime bool) {
 		setThreadCPUProfiler(hz)
 	}
 
-	if trace.enabled {
-		// GoSysExit has to happen when we have a P, but before GoStart.
-		// So we emit it here.
-		if gp.syscallsp != 0 && gp.sysblocktraced {
-			traceGoSysExit(gp.sysexitticks)
-		}
-		traceGoStart()
-	}
-
 	gogo(&gp.sched)
 }
 ```
@@ -293,3 +284,8 @@ func goexit0(gp *g) {
 }
 ```
 
+
+
+
+
+schedule--->execute--->gogo--->goexit--->goexit1--->mcall--->goexit0
