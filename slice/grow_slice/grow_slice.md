@@ -78,7 +78,6 @@ func growslice(et *_type, old slice, cap int) slice {
 			}
 		}
 	}
-
 	var overflow bool // 用以判断是否会溢出
 	var lenmem, newlenmem, capmem uintptr
     // 根据不同的元素尺寸计算出相应的指标，capmem需要进行位对齐
@@ -143,5 +142,5 @@ func growslice(et *_type, old slice, cap int) slice {
 }
 ```
 
-源码不长，逻辑也很清晰，首先要计算出新`slice`的容量cap，然后计算出要分配的内存的大小并进行内存的分配，最后拷贝老的`slice`中的元素到新的`slice`中。
+源码不长，逻辑也很清晰，首先要计算出新`slice`的容量cap，容量小于1024进行双倍扩容，容量大于1024进行oldcap的1/4的递增，直到达到newcap的大小，然后计算出要分配的内存的大小并进行内存的分配，最后拷贝老的`slice`中的元素到新的`slice`中。
 
