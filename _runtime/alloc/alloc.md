@@ -479,10 +479,7 @@ retry:
 		// all subsequent ones must also be either swept or in process of sweeping
 		break
 	}
-	if trace.enabled {
-		traceGCSweepDone()
-		traceDone = true
-	}
+
 	unlock(&c.lock)
 
 	// Replenish central list if empty.
@@ -497,9 +494,6 @@ retry:
 	// At this point s is a non-empty span, queued at the end of the empty list,
 	// c is unlocked.
 havespan:
-	if trace.enabled && !traceDone {
-		traceGCSweepDone()
-	}
 	n := int(s.nelems) - int(s.allocCount)
 	if n == 0 || s.freeindex == s.nelems || uintptr(s.allocCount) == s.nelems {
 		throw("span has no free objects")
@@ -509,21 +503,17 @@ havespan:
 	atomic.Xadd64(&c.nmalloc, int64(n))
 	usedBytes := uintptr(s.allocCount) * s.elemsize
 	atomic.Xadd64(&memstats.heap_live, int64(spanBytes)-int64(usedBytes))
-	if trace.enabled {
-		// heap_live changed.
-		traceHeapAlloc()
-	}
 	if gcBlackenEnabled != 0 {
 		// heap_live changed.
 		gcController.revise()
 	}
+    // 计算出freeindex基于allocBits而言的当前基准位置，方便后面填充allocCache
 	freeByteBase := s.freeindex &^ (64 - 1)
 	whichByte := freeByteBase / 8
 	// Init alloc bits cache.
 	s.refillAllocCache(whichByte)
 
-	// Adjust the allocCache so that s.freeindex corresponds to the low bit in
-	// s.allocCache.
+	// 调整allocCache以便能够和freeindex对应上
 	s.allocCache >>= s.freeindex % 64
 
 	return s
