@@ -6,13 +6,13 @@
 2. 在多线程的情况下减少了锁的竞争
 3. 小对象的高利用率
 
-TCMalloc给每一个线程都有分配一个线程本地缓存thread-local cache，它能够满足小内存块的分配。内存块也能够在其需要的时候从central移动到thread-local cache中，并且也会周期性的从thread-local cache合并到central中。在分配空间大于32K时，会直接从heap中进行分配空间。
+TCMalloc给每一个线程都有分配一个线程本地缓存thread-local cache，它能够满足小内存块的分配。内存块也能够在其需要的时候从central移动到thread-local cache中，并且也会周期性的从thread-local cache合并到central中，方便回收后给其他线程进行使用。在分配空间大于32K时，会直接从heap中进行分配空间。
 
-咱们在这里可以将其看成多级缓存来进行理解。
+咱们在这里可以将其看成多级缓存来进行理解。如下图所示：
 
 ![](http://images.hcyhj.cn/blogimages/mallocgc/tcmalloc.png)
 
-如上图所示，在分配一个新的small内存块(<32K)时，先从thread-local中去获取，因为是从当前线程缓存中去分配空间，所以不会出现并发问题，因而不需要上锁，效率相对来说比较高。如果在thread-local没有足够的空间，则需要向上级central进行申请，这里由于是多个thread共享的操作，所以要加上锁来避免并发问题。central没有足够的空间，则需要向heap进行申请，同样，heap是一个application共享的，也需要加上锁，然后会把申请到的空间逐级返回，并进行缓存。
+如上图，在分配一个新的small内存块(<32K)时，先从thread-local中去获取，因为是从当前线程缓存中去分配空间，所以不会出现并发问题，因而不需要上锁，效率相对来说比较高。如果在thread-local没有足够的空间，则需要向上级central进行申请，这里由于是多个thread共享的操作，所以要加上锁来避免并发问题。central没有足够的空间，则需要向heap进行申请，同样，heap是一个application共享的，也需要加上锁，然后会把申请到的空间逐级返回，并进行缓存。
 
 
 
@@ -53,11 +53,13 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	}
 
 	// Set mp.mallocing to keep from being preempted by GC.
+    // 标记该线程正在分配内存，防止被GC进行抢占
 	mp := acquirem()
 	mp.mallocing = 1
 
 	shouldhelpgc := false
 	dataSize := size
+    // 获取线程本地缓存
 	c := gomcache()
 	var x unsafe.Pointer
 	noscan := typ == nil || typ.kind&kindNoPointers != 0
@@ -88,9 +90,10 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 			}
 			// tinySpanClass值为5，分配一个新的16字节的span
 			span := c.alloc[tinySpanClass]
-            // 进行快速分配
+            // 进行快速分配，从当前的mcache中进行分配
 			v := nextFreeFast(span)
 			if v == 0 {
+                // 这里有可能从central甚至是heap中去分配内存块
 				v, _, shouldhelpgc = c.nextFree(tinySpanClass)
 			}
             // 将分配的16字节置为空
@@ -119,6 +122,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 			v := nextFreeFast(span)
 			if v == 0 {
                 // 当前尺寸的span已经用完了，可能需要重新填充
+                // 这里有可能从central甚至是heap中去分配内存块
 				v, span, shouldhelpgc = c.nextFree(spc)
 			}
 			x = unsafe.Pointer(v)
@@ -130,7 +134,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		var s *mspan
 		shouldhelpgc = true
 		systemstack(func() {
-            // 进行大size的分配
+            // 进行大size的分配,直接从heap中进行分配
 			s = largeAlloc(size, needzero, noscan)
 		})
 		s.freeindex = 1
@@ -150,6 +154,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		if typ == deferType {
 			dataSize = unsafe.Sizeof(_defer{})
 		}
+        // 
 		heapBitsSetType(uintptr(x), size, dataSize, typ)
 		if dataSize > typ.size {
 			// Array allocation. If there are any
@@ -219,7 +224,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 ```go
 // 如果noscan = true
 // 例如sizeClass=2,那么对于的spanClass = 2*2 + 1 = 5
-// 上述例子可得16字节的noscan类型的span
+// 上述例子对应16字节的noscan类型的span
 func makeSpanClass(sizeclass uint8, noscan bool) spanClass {
 	return spanClass(sizeclass<<1) | spanClass(bool2int(noscan))
 }
@@ -231,12 +236,16 @@ func makeSpanClass(sizeclass uint8, noscan bool) spanClass {
 
 ```go
 func nextFreeFast(s *mspan) gclinkptr {
+    // 获取allocCache最小的一个值为1的bit位的索引
+    // 例如 ..11101000,此时计算出的索引位为3
 	theBit := sys.Ctz64(s.allocCache) // Is there a free object in the allocCache?
 	if theBit < 64 {
 		result := s.freeindex + uintptr(theBit)
 		if result < s.nelems {
 			freeidx := result + 1
 			if freeidx%64 == 0 && freeidx != s.nelems {
+                // 由于下一个freeidx已经不在当前allocCache中了，这里要对allocCache
+                // 进行refill,具体逻辑在nextFreeIndex方法中
 				return 0
 			}
 			s.allocCache >>= uint(theBit + 1)
@@ -265,38 +274,37 @@ func (s *mspan) nextFreeIndex() uintptr {
 	}
 
 	aCache := s.allocCache
-
+	// 计算aCache中bit位为1的位置的索引
 	bitIndex := sys.Ctz64(aCache)
 	for bitIndex == 64 {
 		// Move index to start of next cached bits.
+        // 比如咱们的sfreeindex为0，则下一个sfreeindex为64
 		sfreeindex = (sfreeindex + 64) &^ (64 - 1)
 		if sfreeindex >= snelems {
 			s.freeindex = snelems
 			return snelems
 		}
 		whichByte := sfreeindex / 8
-		// Refill s.allocCache with the next 64 alloc bits.
+		// 重新用下一个64位去填充
 		s.refillAllocCache(whichByte)
 		aCache = s.allocCache
 		bitIndex = sys.Ctz64(aCache)
-		// nothing available in cached bits
-		// grab the next 8 bytes and try again.
+		// 没有可用的缓存bit，获取接下来的8个字节的标记位并进行重试
 	}
 	result := sfreeindex + uintptr(bitIndex)
 	if result >= snelems {
 		s.freeindex = snelems
 		return snelems
 	}
-
+	// 可以一次性偏移多个位置，例如
+    // 当前allocCache为11011000，经过sys.Ctz64计算后得到最小的bitIndex为3
+    // 此时会直接将allocCache向左偏移4位变成00001101，一次性将前面位数为0的全部排除掉了
 	s.allocCache >>= uint(bitIndex + 1)
 	sfreeindex = result + 1
 
 	if sfreeindex%64 == 0 && sfreeindex != snelems {
-		// We just incremented s.freeindex so it isn't 0.
-		// As each 1 in s.allocCache was encountered and used for allocation
-		// it was shifted away. At this point s.allocCache contains all 0s.
-		// Refill s.allocCache so that it corresponds
-		// to the bits at s.allocBits starting at s.freeindex.
+		// 进行预填充，此时sfreeindex已经是下一个allocCache的起点了
+        // 这里需要将下一个64bit位填充到allocCache中
 		whichByte := sfreeindex / 8
 		s.refillAllocCache(whichByte)
 	}
@@ -307,19 +315,42 @@ func (s *mspan) nextFreeIndex() uintptr {
 
 
 
+```go
+func (s *mspan) refillAllocCache(whichByte uintptr) {
+    // 从当前位置开始，往后读取8个字节长度（64bits），并经过相应的运算填充到allocCache中
+	bytes := (*[8]uint8)(unsafe.Pointer(s.allocBits.bytep(whichByte)))
+	aCache := uint64(0)
+	aCache |= uint64(bytes[0])
+	aCache |= uint64(bytes[1]) << (1 * 8)
+	aCache |= uint64(bytes[2]) << (2 * 8)
+	aCache |= uint64(bytes[3]) << (3 * 8)
+	aCache |= uint64(bytes[4]) << (4 * 8)
+	aCache |= uint64(bytes[5]) << (5 * 8)
+	aCache |= uint64(bytes[6]) << (6 * 8)
+	aCache |= uint64(bytes[7]) << (7 * 8)
+	s.allocCache = ^aCache
+}
+```
+
+关注一下`refillAllocCache`这个方法，它会从下一个64位开始计算，进行填充`s.allocCache`这个数组，由于当前64位已经用完了，`s.allocCache`中所有的bit都是0（当其中有bit位为1时，Ctz64方法便会返回其索引）。而`s.allocBits`中刚好使用过的标记位为0，未使用过的标记位为1，这里进行位异或运算，将`s.allocCache`进行重新填充，将其可以分配空间的位置标记为1。
+
+
+
 ### mcache.nextFree
 
 ```go
 func (c *mcache) nextFree(spc spanClass) (v gclinkptr, s *mspan, shouldhelpgc bool) {
 	s = c.alloc[spc]
 	shouldhelpgc = false
+    // 寻找下一个可用的freeIndex
 	freeIndex := s.nextFreeIndex()
 	if freeIndex == s.nelems {
-		// The span is full.
 		if uintptr(s.allocCount) != s.nelems {
+            // 当前span已经被用完了，但是分配的总次数和预算的次数不一致，抛出异常
 			println("runtime: s.allocCount=", s.allocCount, "s.nelems=", s.nelems)
 			throw("s.allocCount != s.nelems && freeIndex == s.nelems")
 		}
+        // 从central中获取相应spanClass的span，进行重新填充
 		c.refill(spc)
 		shouldhelpgc = true
 		s = c.alloc[spc]
@@ -340,6 +371,168 @@ func (c *mcache) nextFree(spc spanClass) (v gclinkptr, s *mspan, shouldhelpgc bo
 	return
 }
 ```
+
+
+
+### mache.refill
+
+```go
+	// sweep generation:
+	// if sweepgen == h->sweepgen - 2, the span needs sweeping
+	// if sweepgen == h->sweepgen - 1, the span is currently being swept
+	// if sweepgen == h->sweepgen, the span is swept and ready to use
+	// if sweepgen == h->sweepgen + 1, the span was cached before sweep began and is still cached, and needs sweeping
+	// if sweepgen == h->sweepgen + 3, the span was swept and then cached and is still cached
+	// h->sweepgen is incremented by 2 after every GC
+
+
+func (c *mcache) refill(spc spanClass) {
+	// Return the current cached span to the central lists.
+	s := c.alloc[spc]
+
+	if uintptr(s.allocCount) != s.nelems {
+		throw("refill of span with free space remaining")
+	}
+	if s != &emptymspan {
+		// Mark this span as no longer cached.
+		if s.sweepgen != mheap_.sweepgen+3 {
+			throw("bad sweepgen in refill")
+		}
+		atomic.Store(&s.sweepgen, mheap_.sweepgen)
+	}
+
+	// Get a new cached span from the central lists.
+	s = mheap_.central[spc].mcentral.cacheSpan()
+	if s == nil {
+		throw("out of memory")
+	}
+
+	if uintptr(s.allocCount) == s.nelems {
+		throw("span has no free space")
+	}
+
+	// Indicate that this span is cached and prevent asynchronous
+	// sweeping in the next sweep phase.
+	s.sweepgen = mheap_.sweepgen + 3
+
+	c.alloc[spc] = s
+}
+```
+
+
+
+### mcentral.cacheSpan
+
+```go
+func (c *mcentral) cacheSpan() *mspan {
+	// Deduct credit for this span allocation and sweep if necessary.
+	spanBytes := uintptr(class_to_allocnpages[c.spanclass.sizeclass()]) * _PageSize
+	deductSweepCredit(spanBytes, 0)
+
+	lock(&c.lock)
+	sg := mheap_.sweepgen
+retry:
+	var s *mspan
+	for s = c.nonempty.first; s != nil; s = s.next {
+		if s.sweepgen == sg-2 && atomic.Cas(&s.sweepgen, sg-2, sg-1) {
+			c.nonempty.remove(s)
+			c.empty.insertBack(s)
+			unlock(&c.lock)
+			s.sweep(true)
+			goto havespan
+		}
+		if s.sweepgen == sg-1 {
+			// the span is being swept by background sweeper, skip
+			continue
+		}
+		// we have a nonempty span that does not require sweeping, allocate from it
+		c.nonempty.remove(s)
+		c.empty.insertBack(s)
+		unlock(&c.lock)
+		goto havespan
+	}
+
+	for s = c.empty.first; s != nil; s = s.next {
+		if s.sweepgen == sg-2 && atomic.Cas(&s.sweepgen, sg-2, sg-1) {
+			// we have an empty span that requires sweeping,
+			// sweep it and see if we can free some space in it
+			c.empty.remove(s)
+			// swept spans are at the end of the list
+			c.empty.insertBack(s)
+			unlock(&c.lock)
+			s.sweep(true)
+			freeIndex := s.nextFreeIndex()
+			if freeIndex != s.nelems {
+				s.freeindex = freeIndex
+				goto havespan
+			}
+			lock(&c.lock)
+			// the span is still empty after sweep
+			// it is already in the empty list, so just retry
+			goto retry
+		}
+		if s.sweepgen == sg-1 {
+			// the span is being swept by background sweeper, skip
+			continue
+		}
+		// already swept empty span,
+		// all subsequent ones must also be either swept or in process of sweeping
+		break
+	}
+	if trace.enabled {
+		traceGCSweepDone()
+		traceDone = true
+	}
+	unlock(&c.lock)
+
+	// Replenish central list if empty.
+	s = c.grow()
+	if s == nil {
+		return nil
+	}
+	lock(&c.lock)
+	c.empty.insertBack(s)
+	unlock(&c.lock)
+
+	// At this point s is a non-empty span, queued at the end of the empty list,
+	// c is unlocked.
+havespan:
+	if trace.enabled && !traceDone {
+		traceGCSweepDone()
+	}
+	n := int(s.nelems) - int(s.allocCount)
+	if n == 0 || s.freeindex == s.nelems || uintptr(s.allocCount) == s.nelems {
+		throw("span has no free objects")
+	}
+	// Assume all objects from this span will be allocated in the
+	// mcache. If it gets uncached, we'll adjust this.
+	atomic.Xadd64(&c.nmalloc, int64(n))
+	usedBytes := uintptr(s.allocCount) * s.elemsize
+	atomic.Xadd64(&memstats.heap_live, int64(spanBytes)-int64(usedBytes))
+	if trace.enabled {
+		// heap_live changed.
+		traceHeapAlloc()
+	}
+	if gcBlackenEnabled != 0 {
+		// heap_live changed.
+		gcController.revise()
+	}
+	freeByteBase := s.freeindex &^ (64 - 1)
+	whichByte := freeByteBase / 8
+	// Init alloc bits cache.
+	s.refillAllocCache(whichByte)
+
+	// Adjust the allocCache so that s.freeindex corresponds to the low bit in
+	// s.allocCache.
+	s.allocCache >>= s.freeindex % 64
+
+	return s
+}
+```
+
+
+
+
 
 ### largeAlloc
 
