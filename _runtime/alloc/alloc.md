@@ -494,19 +494,7 @@ retry:
 	// At this point s is a non-empty span, queued at the end of the empty list,
 	// c is unlocked.
 havespan:
-	n := int(s.nelems) - int(s.allocCount)
-	if n == 0 || s.freeindex == s.nelems || uintptr(s.allocCount) == s.nelems {
-		throw("span has no free objects")
-	}
-	// Assume all objects from this span will be allocated in the
-	// mcache. If it gets uncached, we'll adjust this.
-	atomic.Xadd64(&c.nmalloc, int64(n))
-	usedBytes := uintptr(s.allocCount) * s.elemsize
-	atomic.Xadd64(&memstats.heap_live, int64(spanBytes)-int64(usedBytes))
-	if gcBlackenEnabled != 0 {
-		// heap_live changed.
-		gcController.revise()
-	}
+	
     // 计算出freeindex基于allocBits而言的当前基准位置，方便后面填充allocCache
 	freeByteBase := s.freeindex &^ (64 - 1)
 	whichByte := freeByteBase / 8
