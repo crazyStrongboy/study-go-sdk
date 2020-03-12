@@ -40,6 +40,9 @@ func main() {
 }
 
 func maxProfit(prices []int) int {
+	if len(prices) == 0 {
+		return 0
+	}
 	i := 0
 	valley := prices[0]
 	peak := prices[0]
