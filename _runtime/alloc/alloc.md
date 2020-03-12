@@ -12,7 +12,7 @@ TCMalloc给每一个线程都有分配一个线程本地缓存thread-local cache
 
 ![](http://images.hcyhj.cn/blogimages/mallocgc/tcmalloc.png)
 
-如上图所示，在分配一个新的small内存块(<32K)时，先从thread-local中去获取，因为是从当前线程缓存中去分配空间，所以不会出现并发问题，因而不需要上锁，效率相对来说比较高。如果在thread-local没有足够的空间，则需要向上级central进行申请，这里由于是多个thread共享的操作，所以要加上锁来避免并发问题。central没有足够的空间，则需要向heap进行申请，同样，heap是一个application共享的，也需要加上锁。
+如上图所示，在分配一个新的small内存块(<32K)时，先从thread-local中去获取，因为是从当前线程缓存中去分配空间，所以不会出现并发问题，因而不需要上锁，效率相对来说比较高。如果在thread-local没有足够的空间，则需要向上级central进行申请，这里由于是多个thread共享的操作，所以要加上锁来避免并发问题。central没有足够的空间，则需要向heap进行申请，同样，heap是一个application共享的，也需要加上锁，然后会把申请到的空间逐级返回，并进行缓存。
 
 
 
