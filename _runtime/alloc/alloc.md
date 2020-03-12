@@ -1,3 +1,23 @@
+### TCMalloc简介
+
+由于Go的内存分配采用的是TCMalloc算法，所以在这之前，咱们得先了解一下TCMalloc的具体原理，可以参考一下这篇文章[TCMalloc : Thread-Caching Malloc](http://goog-perftools.sourceforge.net/doc/tcmalloc.html)。总的来说，这个算法有以下三个优点：
+
+1. 分配更快
+2. 在多线程的情况下减少了锁的竞争
+3. 小对象的高利用率
+
+TCMalloc给每一个线程都有分配一个线程本地缓存thread-local cache，它能够满足小内存块的分配。内存块也能够在其需要的时候从central移动到thread-local cache中，并且也会周期性的从thread-local cache合并到central中。在分配空间大于32K时，会直接从heap中进行分配空间。
+
+咱们在这里可以将其看成多级缓存来进行理解。
+
+![](http://images.hcyhj.cn/blogimages/mallocgc/tcmalloc.png)
+
+如上图所示，在分配一个新的small内存块(<32K)时，先从thread-local中去获取，因为是从当前线程缓存中去分配空间，所以不会出现并发问题，因而不需要上锁，效率相对来说比较高。如果在thread-local没有足够的空间，则需要向上级central进行申请，这里由于是多个thread共享的操作，所以要加上锁来避免并发问题。central没有足够的空间，则需要向heap进行申请，同样，heap是一个application共享的，也需要加上锁。
+
+
+
+了解了一下TCMalloc的相关知识点后，咱们进行Go的内存分配相关源码的研究。
+
 ### mallocgc
 
 ```go
