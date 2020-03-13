@@ -2,13 +2,63 @@
 
 
 
+简单的看一段程序，代码很简单，咱们主要来分析一下`defer`具体的执行流程。
+
+```go
+func main() {
+	f()
+}
+
+func f() {
+	defer sum(1, 2)
+}
+
+func sum(a, b int) int {
+	return a + b
+}
+```
+
+咱们看一下汇编指令，重点部分都加有注释，对函数调用过程这一块不太了解的可以去看一下[这篇文章](https://cloud.tencent.com/developer/article/1450282)。
+
+```assembly
+x0x44f94b <main.main+27> callq  0x44f960 <main.f>                                         
+x0x44f950 <main.main+32> mov    (%rsp),%rbp                                               
+x0x44f954 <main.main+36> add    $0x8,%rsp                                                 
+x0x44f958 <main.main+40> retq                                                             
+x0x44f959 <main.main+41> callq  0x447840 <runtime.morestack_noctxt>                       
+x0x44f95e <main.main+46> jmp    0x44f930 <main.main>                                     
+x0x44f960 <main.f>       mov    %fs:0xfffffffffffffff8,%rcx                               
+x0x44f969 <main.f+9>     cmp    0x10(%rcx),%rsp                                           
+x0x44f96d <main.f+13>    jbe    0x44f9cb <main.f+107>                                     
+x0x44f96f <main.f+15>    sub    $0x30,%rsp # 分配函数f的栈空间
+x0x44f973 <main.f+19>    mov    %rbp,0x28(%rsp) # 保存main函数的rbp到0x28(%rsp)中
+x0x44f978 <main.f+24>    lea    0x28(%rsp),%rbp # 将0x28(%rsp)位置作为函数f的rbp
+x0x44f97d <main.f+29>    movl   $0x18,(%rsp)  # rsp(0)位置为24，代表参数长度           
+x0x44f984 <main.f+36>    lea    0x23c85(%rip),%rax   # 0x473610 这里是sum函数的地址    
+x0x44f98b <main.f+43>    mov    %rax,0x8(%rsp)  # rsp(8)位置为sum函数的地址      
+x0x44f990 <main.f+48>    movq   $0x1,0x10(%rsp)  # rsp(16)位置为第一个参数值1               
+x0x44f999 <main.f+57>    movq   $0x2,0x18(%rsp) # rsp(24)位置为第一个参数值2
+x0x44f9a2 <main.f+66>    callq  0x4221f0 <runtime.deferproc># 关注点1 
+x0x44f9a7 <main.f+71>    test   %eax,%eax                                                 
+x0x44f9a9 <main.f+73>    jne    0x44f9bb <main.f+91>                                     
+x0x44f9ab <main.f+75>    nop                                                             
+x0x44f9ac <main.f+76>    callq  0x422a80 <runtime.deferreturn> # 关注点2
+x0x44f9b1 <main.f+81>    mov    0x28(%rsp),%rbp # 恢复成main函数的rbp       
+x0x44f9b6 <main.f+86>    add    $0x30,%rsp   # 将栈空间还原
+x0x44f9ba <main.f+90>    retq     
+```
+
+
+
+关注一下上面的两个关注点，`runtime.deferproc`与`runtime.deferreturn`这两个方法。
+
 
 
 ```go
 // A _defer holds an entry on the list of deferred calls.
 // If you add a field here, add code to clear it in freedefer.
 type _defer struct {
-	siz     int32
+	siz     int32 // 参数的长度
 	started bool
 	sp      uintptr // sp at time of defer
 	pc      uintptr
@@ -17,10 +67,6 @@ type _defer struct {
 	link    *_defer
 }
 ```
-
-
-
-
 
 
 
