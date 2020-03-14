@@ -1,6 +1,8 @@
+### 前言
 
+`defer`这个关键字在开发过程中上场率可不低，初学者只会知道在当前函数中声明一个`defer`函数，那么会在当前函数`return`时再去执行`defer`定义的函数，但具体原因是什么呢？假如在当前函数同时声明多个`defer`函数，为何先声明的后执行呢？要想弄懂这些问题，可以从本文中得到答案。
 
-
+### Example
 
 简单的看一段程序，代码很简单，咱们主要来分析一下`defer`具体的执行流程。一个简单的`defer`关键字在经过编译之后究竟经过了哪些方法的调用。
 
@@ -35,7 +37,7 @@ Dump of assembler code for function main.f:
    0x000000000044f990 <+48>:    movq   $0x1,0x10(%rsp)  # rsp(16)位置为第一个参数值1
    0x000000000044f999 <+57>:    movq   $0x2,0x18(%rsp) # rsp(24)位置为第二个参数值2
    0x000000000044f9a2 <+66>:    callq  0x4221f0 <runtime.deferproc># 关注点1 
-   0x000000000044f9a7 <+71>:    test   %eax,%eax  
+   0x000000000044f9a7 <+71>:    test   %eax,%eax  # deferproc后自动插入的一条指令。正常情况下eax寄存器中返回的值是0，执行接下来的业务逻辑。但是当业务逻辑panic后，并且有recover的情况下，eax寄存器中会被填入1，则经过该指令对比后直接跳转到0x44f9bb处的deferreturn
    0x000000000044f9a9 <+73>:    jne    0x44f9bb <main.f+91>                         
    0x000000000044f9ab <+75>:    nop                                                 
    0x000000000044f9ac <+76>:    callq  0x422a80 <runtime.deferreturn> # 关注点2
@@ -70,7 +72,7 @@ type _defer struct {
 }
 ```
 
-### deferproc函数
+### deferproc
 
 ```go
 // siz=参数长度
@@ -92,7 +94,7 @@ func deferproc(siz int32, fn *funcval) { // arguments of fn follow fn
 		throw("deferproc: d.panic != nil after newdefer")
 	}
 	d.fn = fn
-	d.pc = callerpc
+	d.pc = callerpc // 在panic-recover后，用来跳转的指令
 	d.sp = sp
 	switch siz {
 	case 0:
@@ -120,11 +122,20 @@ type funcval struct {
 }
 ```
 
-参数部分紧随着`fn`，按本文的例子，这里的`fn=&sum`，参数a,b以及返回参数紧跟着`fn`排列。由于go中函数调用参数通过栈来传递，所以此时堆栈结构是：
+`fn`的参数部分紧随着`fn`，按本文的例子，这里的`fn=&sum`，参数a,b以及返回参数紧跟着`fn`排列。由于go中函数调用参数通过栈来传递，所以此时堆栈结构是：
 
 ![deferproc](http://images.hcyhj.cn/blogimages/defer/deferproc.png)
 
-在函数`deferproc`中，会先获取一个`defer`结构体对应的对象，并给其sp属性附上当前调用者f的栈顶sp的值，
+在函数`deferproc`中，
+
+1. 会先通过`newdefer(siz)`获取一个`defer`结构体对应的对象。具体是从缓存中获取还是新分配一个，下面会进行详细的解释。
+2. 并给其sp属性附上当前调用者f的栈顶sp的值，后面进行`deferreturn`时会通过这个值去进行判断要执行的`defer`是否属于当前调用者。
+3. 然后会将参数部分拷贝到紧挨着`defer`对象后面的地址：```deferArgs(d)=unsafe.Pointer(d)+unsafe.Sizeof(*d)```。
+4. 执行`return0`函数，正常情况下返回0，经过`test   %eax,%eax`检测后继续执行业务逻辑。异常情况下会返回1，并且直接跳转到`deferreturn`。
+
+
+
+### newdefer
 
 ```go
 //go:nosplit
@@ -139,6 +150,7 @@ func newdefer(siz int32) *_defer {
 			// 当前p上缓存用完了，则需要从全局区拷贝几个出来，
             // 直到拷贝到deferpool容量的一半
 			systemstack(func() {
+                // 加上锁，有可能多个p同时去拉取
 				lock(&sched.deferlock)
 				for len(pp.deferpool[sc]) < cap(pp.deferpool[sc])/2 && sched.deferpool[sc] != nil {
 					d := sched.deferpool[sc]
@@ -182,11 +194,19 @@ func newdefer(siz int32) *_defer {
 }
 ```
 
+分配`defer`的流程大概分为三步走：
+
+1. 由于缓冲区中是根据参数的长度进行不同级别的`defer`来缓存的，所以得先计算出相应的`sc`值。
+2. 判断`sc`的值是否在缓冲区允许的范围内。
+   - 在范围内，即sc<5，则先检查当前p的缓冲区中是否还有可用的`defer`。
+     - 没有可用，则去全局缓冲区`sched`中批量拉取直至达到当前p缓冲区容量的一半。
+     - 若有可用，则直接取出当前p缓冲区对应尺寸的`[]defer`最后一个元素即可。
+   - 不在范围内，由于参数过大，不合适缓存在缓冲区中，则直接新分配一个。
+3. 将获取的`defer`绑定到当前goroutine上。并与之前绑定的`defer`形成链表。
 
 
 
-
-
+### deferreturn
 
 ```go
 func deferreturn(arg0 uintptr) {
@@ -194,6 +214,7 @@ func deferreturn(arg0 uintptr) {
     // 获取g上绑定的第一个defer
 	d := gp._defer
 	if d == nil {
+        // 由于是递归调用，这里是一个循环终止条件，d上已经没有绑定的defer了
 		return
 	}
     // 获取当前调用者的sp
@@ -223,16 +244,25 @@ func deferreturn(arg0 uintptr) {
 	d.fn = nil
     // g中的defer指向下一个defer
 	gp._defer = d.link
-    // 进行释放
+    // 进行释放，归还到相应的缓冲区或者让gc回收
 	freedefer(d)
 	// 执行defer中绑定的func
 	jmpdefer(fn, uintptr(unsafe.Pointer(&arg0)))
 }
 ```
 
+1. 判断当前goroutine上是否还有绑定的`defer`，若没有，直接return。
+2. 获取goroutine绑定的`defer`链表头部的`defer`。
+3. 判断当前`defer`中存储的sp是否和调用者的sp一致，若不一致，也直接return，证明当前defer不是在此调用函数中声明的。
+4. 进行参数的拷贝。
+5. 释放当前要执行fn关联的defer。
+6. 执行`jmpdefer`函数，这里会执行完fn的逻辑后递归调用`deferreturn`函数。
 
 
 
+接着看一下`jmpdefer`函数，咱们拆开一句句的去看。
+
+*runtime/asm_amd64.s：566*
 
 ```assembly
 // func jmpdefer(fv *funcval, argp uintptr)
@@ -252,11 +282,54 @@ TEXT runtime·jmpdefer(SB), NOSPLIT, $0-16
 
 ```
 
+![jmpdefer](http://images.hcyhj.cn/blogimages/defer/jmpdefer.png)
 
+在执行`deferreturn`调用时，栈帧内部结构大概如上图所示，咱们简单的梳理一下。`deferreturn`只有一个参数`arg0`，所以在栈中的具体位置肯定是靠近其返回地址的。返回地址对应的sp实际上是函数f的sp。
 
+这里咱们将上面的汇编代码拆解进行一一分析：
 
+```assembly
+MOVQ	fv+0(FP), DX   
+```
 
+将`fv.fn`地址放到DX寄存器中。
 
+```assembly
+MOVQ	argp+8(FP), BX
+```
+
+将`argp`的地址放到BX寄存器中，实际上就是上图中的`&arg0`。
+
+```assembly
+LEAQ	-8(BX), SP
+```
+
+将BX地址减去8，并将对应的地址放到寄存器SP中。实际上`&arg0`地址减去8指向的是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`，所以这里实际上将SP寄存器置为函数f的栈顶。
+
+```assembly
+MOVQ	-8(SP), BP
+```
+
+SP-8的位置恰好存放这个函数f的bp，这里将其值存放到BP寄存器中。经过了上面四句指令，已经成功将函数栈从`deferreturn`切换到了`f`中。
+
+```assembly
+SUBQ	$5, (SP)
+```
+
+将SP向上移动5位，一般人可能会在这里有疑惑，咱们先看一张图片
+
+![jmpdefer2](http://images.hcyhj.cn/blogimages/defer/jmpdefer2.png)
+
+咱们上面有说到，sp指向的位置是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`。很神奇的就是SP-5后，咱们可以发现SP又指向了`callq  0x422a80 <runtime.deferreturn>`的位置。相当于该位置成为了栈顶。这样在执行完函数`fn`之后，又会继续执行`deferreturn`函数，相当于一个递归调用。
+
+```assembly
+MOVQ	0(DX), BX
+JMP	BX
+```
+
+跳转到指定的fn函数去执行相关逻辑。执行完成后跳转到`deferreturn`函数。
+
+### freedefer
 
 ```go
 //go:nosplit
@@ -311,5 +384,20 @@ func freedefer(d *_defer) {
 }
 ```
 
+释放已经用过的`defer`：
+
+1. 首先判断参数长度，参数长度过长的直接让gc进行回收即可，无需归还到缓冲区中。
+2. 若当前p的缓冲区已经满了，则需要进行迁移操作，这里会将当前p容量一半的`defer`归还到全局缓冲区，供给其他的p使用。操作的时候需要加上锁，防止多个p出现并发操作。
+3. 将其属性置空，并追加到`pp.deferpool[sc] `数组中。
 
 
+
+### 总结
+
+本文主要涉及到`defer`这个关键字在编译之后究竟是怎样嵌入我们的代码的，以及`defer`后的函数是何时调用的，例如会先调用`deferproc`在goroutine上绑定`defer`链表，然后执行`deferreturn`时依次遍历链表执行`defer`中的函数，正向插入，反向遍历，这样也能看出先定义的`defer`后执行。当然还有部分点未做涉及，例如panic后`defer`中函数的调用，以及`recover`是如何实现的。下一篇文章会对这一块进行分析。
+
+
+
+### 参考文章
+
+[深入理解defer（下）defer实现机制](https://cloud.tencent.com/developer/article/1450260)
