@@ -37,7 +37,10 @@ Dump of assembler code for function main.f:
    0x000000000044f990 <+48>:    movq   $0x1,0x10(%rsp)  # rsp(16)位置为第一个参数值1
    0x000000000044f999 <+57>:    movq   $0x2,0x18(%rsp) # rsp(24)位置为第二个参数值2
    0x000000000044f9a2 <+66>:    callq  0x4221f0 <runtime.deferproc># 关注点1 
-   0x000000000044f9a7 <+71>:    test   %eax,%eax  # deferproc后自动插入的一条指令。正常情况下eax寄存器中返回的值是0，执行接下来的业务逻辑。但是当业务逻辑panic后，并且有recover的情况下，eax寄存器中会被填入1，则经过该指令对比后直接跳转到0x44f9bb处的deferreturn
+   # deferproc后自动插入的一条指令。正常情况下eax寄存器中返回的值是0，执行接下来的业务逻辑。
+   # 但是当业务逻辑panic后，并且有recover的情况下，eax寄存器中会被填入1，
+   # 则经过该指令对比后直接跳转到0x44f9bb处的deferreturn
+   0x000000000044f9a7 <+71>:    test   %eax,%eax  
    0x000000000044f9a9 <+73>:    jne    0x44f9bb <main.f+91>                         
    0x000000000044f9ab <+75>:    nop                                                 
    0x000000000044f9ac <+76>:    callq  0x422a80 <runtime.deferreturn> # 关注点2
@@ -304,13 +307,13 @@ MOVQ	argp+8(FP), BX
 LEAQ	-8(BX), SP
 ```
 
-将BX地址减去8，并将对应的地址放到寄存器SP中。实际上`&arg0`地址减去8指向的是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`，所以这里实际上将SP寄存器置为函数f的栈顶。
+将BX地址减去8，并将对应的地址放到寄存器SP中。实际上`&arg0`地址减去8指向的是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`，所以这里实际上将SP寄存器指向函数f的栈顶。
 
 ```assembly
 MOVQ	-8(SP), BP
 ```
 
-SP-8的位置恰好存放这个函数f的bp，这里将其值存放到BP寄存器中。经过了上面四句指令，已经成功将函数栈从`deferreturn`切换到了`f`中。
+SP-8的位置恰好存放函数f的bp，这里将其值存放到BP寄存器中。经过了上面四句指令，已经成功将函数栈从`deferreturn`切换到了`f`中。
 
 ```assembly
 SUBQ	$5, (SP)
@@ -320,7 +323,7 @@ SUBQ	$5, (SP)
 
 ![jmpdefer2](http://images.hcyhj.cn/blogimages/defer/jmpdefer2.png)
 
-咱们上面有说到，sp指向的位置是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`。很神奇的就是SP-5后，咱们可以发现SP又指向了`callq  0x422a80 <runtime.deferreturn>`的位置。相当于该位置成为了栈顶。这样在执行完函数`fn`之后，又会继续执行`deferreturn`函数，相当于一个递归调用。
+咱们上面有说到，sp指向的位置是`deferreturn`的返回地址，也就是` callq  0x422a80 <runtime.deferreturn>`的下一条指令`mov    0x28(%rsp),%rbp`。很神奇的就是SP-5后，咱们可以发现SP又指向了`callq  0x422a80 <runtime.deferreturn>`的位置，相当于该位置成为了栈顶。这样在执行完函数`fn`之后，又会继续执行`deferreturn`函数，相当于一个递归调用。
 
 ```assembly
 MOVQ	0(DX), BX #将fn地址放到BX寄存器中
