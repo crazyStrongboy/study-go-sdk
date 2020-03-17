@@ -42,6 +42,8 @@ loop:
 }
 
 func singleNumber1(nums []int) int {
+	// 相同的数字异或之后都为0
+	// 任何数字与0异或都是原本数字
 	ret := 0
 	for _, value := range nums {
 		ret ^= value
