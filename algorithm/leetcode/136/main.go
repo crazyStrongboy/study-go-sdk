@@ -25,7 +25,7 @@ import "fmt"
 */
 
 func main() {
-	fmt.Println(singleNumber([]int{4, 1, 2, 1, 2}))
+	fmt.Println(singleNumber1([]int{4, 1, 2, 1, 2}))
 }
 
 func singleNumber(nums []int) int {
@@ -39,4 +39,12 @@ loop:
 		return nums[i]
 	}
 	return 0
+}
+
+func singleNumber1(nums []int) int {
+	ret := 0
+	for _, value := range nums {
+		ret ^= value
+	}
+	return ret
 }
