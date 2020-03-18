@@ -23,7 +23,7 @@ import "fmt"
 */
 
 func main() {
-	size := removeDuplicates([]int{0, 0, 1, 1, 1, 2, 2, 3, 3, 4})
+	size := removeDuplicates2([]int{0, 0, 1, 1, 1, 2, 2, 3, 3, 4})
 	fmt.Println(size)
 }
 
@@ -61,4 +61,18 @@ func removeDuplicates1(nums []int) int {
 	}
 	fmt.Println(nums)
 	return i + 1
+}
+
+func removeDuplicates2(nums []int) []int {
+	if len(nums) == 0 {
+		return nums
+	}
+	i := 0
+	for j := 1; j < len(nums); j++ {
+		if nums[j] != nums[i] {
+			i++
+			nums[i] = nums[j]
+		}
+	}
+	return nums[0 : i+1]
 }
