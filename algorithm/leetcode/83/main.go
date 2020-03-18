@@ -12,8 +12,8 @@ import "fmt"
  */
 
 func main() {
-	head := &ListNode{1, &ListNode{1, &ListNode{2, &ListNode{3, &ListNode{3, nil}}}}}
-	listNode := deleteDuplicates(head)
+	head := &ListNode{1, &ListNode{2, &ListNode{3, &ListNode{4, &ListNode{5, nil}}}}}
+	listNode := reverseList(head)
 	curr := listNode
 	for curr != nil {
 		fmt.Println(curr.Val)
@@ -43,4 +43,23 @@ func deleteDuplicates(head *ListNode) *ListNode {
 		}
 	}
 	return head
+}
+
+// 反转链表
+func reverseList(head *ListNode) *ListNode {
+
+	if head == nil {
+		return head
+	}
+
+	var prev *ListNode = nil
+	var node *ListNode = nil
+	for head != nil {
+		node = head
+		head = head.Next
+
+		node.Next = prev
+		prev = node
+	}
+	return node
 }
