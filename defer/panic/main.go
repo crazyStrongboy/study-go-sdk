@@ -8,16 +8,19 @@ import "fmt"
 */
 
 func main() {
-	//defer func() {
-	//	if err := recover(); err != nil {
-	//		fmt.Println(err)
-	//	}
-	//}()
+	defer func() {
+		func() {
+			if err := recover(); err != nil {
+				fmt.Println(err)
+			}
+		}()
+
+	}()
 
 	//defer recover()
 	//
-	//panic("xxxx")
-	f()
+	panic("xxxx")
+	//f()
 }
 
 func f() {
