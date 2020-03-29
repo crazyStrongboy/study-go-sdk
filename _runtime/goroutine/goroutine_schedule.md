@@ -288,4 +288,4 @@ func goexit0(gp *g) {
 
 
 
-schedule--->execute--->gogo--->goexit--->goexit1--->mcall--->goexit0
+schedule--->execute--->gogo--->goexit--->goexit1--->mcall--->goexit0--->schedule
