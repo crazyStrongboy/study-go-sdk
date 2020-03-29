@@ -332,7 +332,7 @@ func (s *mspan) refillAllocCache(whichByte uintptr) {
 }
 ```
 
-关注一下`refillAllocCache`这个方法，它会从下一个64位开始计算，进行填充`s.allocCache`这个数组，由于当前64位已经用完了，`s.allocCache`中所有的bit都是0（当其中有bit位为1时，Ctz64方法便会返回其索引）。而`s.allocBits`中刚好使用过的标记位为0，未使用过的标记位为1，这里进行位异或运算，将`s.allocCache`进行重新填充，将其可以分配空间的位置标记为1。
+关注一下`refillAllocCache`这个方法，它会从下一个64位开始计算，进行填充`s.allocCache`这个数组，由于当前64位已经用完了，`s.allocCache`中所有的bit都是0（当其中有bit位为1时，Ctz64方法便会返回其索引）。而`s.allocBits`中刚好gc过后还存在的标记位为1，被回收的标记位为0，这里进行运算（将0置位1,1置位0），将`s.allocCache`进行重新填充，将其可以分配空间的位置标记为1。
 
 
 
