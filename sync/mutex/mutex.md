@@ -6,32 +6,38 @@ type Mutex struct {
 ```
 
 
+
+
+
+
 ```go
 const (
-	mutexLocked = 1 << iota // mutex is locked
-	mutexWoken
-	mutexStarving
-	mutexWaiterShift = iota
+	mutexLocked = 1 << iota // mutex is locked  //1
+	mutexWoken // 2
+	mutexStarving // 4
+	mutexWaiterShift = iota //3
 
-	starvationThresholdNs = 1e6
+	starvationThresholdNs = 1e6 // 1*10^6
 )
 ```
 
+
+
+
+
 ```go
 func (m *Mutex) Lock() {
-	// Fast path: grab unlocked mutex.
+	// 快速锁定，当前没有其他竞争者来抢占锁
 	if atomic.CompareAndSwapInt32(&m.state, 0, mutexLocked) {
 		return
 	}
-
 	var waitStartTime int64
 	starving := false
 	awoke := false
 	iter := 0
 	old := m.state
 	for {
-		// Don't spin in starvation mode, ownership is handed off to waiters
-		// so we won't be able to acquire the mutex anyway.
+		// 饥饿模式下不允许自旋
 		if old&(mutexLocked|mutexStarving) == mutexLocked && runtime_canSpin(iter) {
 			// Active spinning makes sense.
 			// Try to set mutexWoken flag to inform Unlock
@@ -50,24 +56,21 @@ func (m *Mutex) Lock() {
 		if old&mutexStarving == 0 {
 			new |= mutexLocked
 		}
+        // waiter队列数目+1
 		if old&(mutexLocked|mutexStarving) != 0 {
 			new += 1 << mutexWaiterShift
 		}
-		// The current goroutine switches mutex to starvation mode.
-		// But if the mutex is currently unlocked, don't do the switch.
-		// Unlock expects that starving mutex has waiters, which will not
-		// be true in this case.
+		// 在满足饥饿模式的条件下,将state置为饥饿模式
 		if starving && old&mutexLocked != 0 {
 			new |= mutexStarving
 		}
 		if awoke {
-			// The goroutine has been woken from sleep,
-			// so we need to reset the flag in either case.
+			// 当前被唤醒，去掉mutexWoken标记
 			if new&mutexWoken == 0 {
 				throw("sync: inconsistent mutex state")
-			}
-			new &^= mutexWoken
-		}
+            }
+            new &^= mutexWoken
+        }
 		if atomic.CompareAndSwapInt32(&m.state, old, new) {
 			if old&(mutexLocked|mutexStarving) == 0 {
 				break // locked the mutex with CAS
@@ -112,7 +115,7 @@ func (m *Mutex) Lock() {
 
 ```go
 func (m *Mutex) Unlock() {
-	// Fast path: drop lock bit.
+    // unlock一个没有lock过的锁，直接抛异常
 	new := atomic.AddInt32(&m.state, -mutexLocked)
 	if (new+mutexLocked)&mutexLocked == 0 {
 		throw("sync: unlock of unlocked mutex")
