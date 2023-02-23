@@ -1,3 +1,3 @@
 module github.com/crazyStrongboy/study-go-sdk
 
-go 1.12
+go 1.18
