@@ -6,7 +6,7 @@ func main() {
 	fmt.Println(canJump([]int{3, 0, 0, 0}))
 }
 
-func canJump(nums []int) bool {
+func canJump1(nums []int) bool {
 	if len(nums) <= 1 {
 		return true
 	}
@@ -30,4 +30,24 @@ func canJump(nums []int) bool {
 		}
 	}
 	return true
+}
+
+func canJump(nums []int) bool {
+	m := 0
+	for i := range nums {
+		if i <= m {
+			m = max(m, i+nums[i])
+			if m >= len(nums)-1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
