@@ -34,23 +34,29 @@ func wordBreak2(s string, wordDict []string) bool {
 		m[w] = true
 	}
 	t := &T{
-		m: m,
+		m:    m,
+		used: map[int]bool{},
 	}
 	return t.backtrack(s, 0)
 }
 
 type T struct {
-	m map[string]bool
+	m    map[string]bool
+	used map[int]bool
 }
 
 func (t *T) backtrack(s string, start int) bool {
 	if start >= len(s) {
 		return true
 	}
-	for i := start; i <= len(s); i++ {
+	if v, ok := t.used[start]; ok {
+		return v
+	}
+	for i := start; i < len(s); i++ {
 		if t.m[s[start:i+1]] && t.backtrack(s, i+1) {
 			return true
 		}
 	}
+	t.used[start] = false
 	return false
 }
