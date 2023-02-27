@@ -20,31 +20,41 @@ func main() {
 
 type LRUCache struct {
 	m        map[int]*v
-	expire   []int
 	capacity int
+	head     *linked
+	tail     *linked
+}
+
+type linked struct {
+	prev *linked
+	next *linked
+	key  int
 }
 
 type v struct {
-	index int
-	value int
+	linked *linked
+	value  int
 }
 
 func Constructor(capacity int) LRUCache {
+	h := &linked{}
+	t := &linked{prev: h}
+	h.next = t
 	return LRUCache{
 		m:        make(map[int]*v),
 		capacity: capacity,
+		head:     h,
+		tail:     t,
 	}
 }
 
 func (this *LRUCache) Get(key int) int {
 	if v, ok := this.m[key]; ok {
-		i := v.index
-		for _, k := range this.expire[i+1:] {
-			this.m[k].index--
-		}
-		this.expire = append(this.expire[0:i], this.expire[i+1:]...)
-		this.expire = append(this.expire, key)
-		v.index = len(this.expire) - 1
+		v.linked.prev.next, v.linked.next.prev = v.linked.next, v.linked.prev
+		t := &linked{key: key, prev: this.tail.prev, next: this.tail}
+		this.tail.prev.next = t
+		this.tail.prev = t
+		v.linked = t
 		return v.value
 	}
 	return -1
@@ -52,27 +62,24 @@ func (this *LRUCache) Get(key int) int {
 
 func (this *LRUCache) Put(key int, value int) {
 	if v, ok := this.m[key]; ok {
-		i := v.index
-		for _, k := range this.expire[i+1:] {
-			this.m[k].index--
-		}
-		this.expire = append(this.expire[0:i], this.expire[i+1:]...)
-		this.expire = append(this.expire, key)
-		v.index = len(this.expire) - 1
+		v.linked.prev.next, v.linked.next.prev = v.linked.next, v.linked.prev
+		t := &linked{key: key, prev: this.tail.prev, next: this.tail}
+		this.tail.prev.next = t
+		this.tail.prev = t
 		v.value = value
+		v.linked = t
 		return
 	}
 	if len(this.m) == this.capacity {
-		expireKey := this.expire[0]
-		delete(this.m, expireKey)
-		this.expire = this.expire[1:]
-		for _, k := range this.expire {
-			this.m[k].index--
-		}
+		delete(this.m, this.head.next.key)
+		this.head.next = this.head.next.next
+		this.head.next.prev = this.head
 	}
-	this.expire = append(this.expire, key)
+	t := &linked{key: key, prev: this.tail.prev, next: this.tail}
+	this.tail.prev.next = t
+	this.tail.prev = t
 	this.m[key] = &v{
-		index: len(this.expire) - 1,
-		value: value,
+		linked: t,
+		value:  value,
 	}
 }
