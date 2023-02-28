@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	fmt.Println(maxProduct([]int{2, 3, -2, 4}))
+	fmt.Println(maxProduct1([]int{2, 3, -2, 4}))
 }
 
 func maxProduct(nums []int) int {
@@ -24,4 +24,36 @@ func maxProduct(nums []int) int {
 		}
 	}
 	return max
+}
+
+func maxProduct1(nums []int) int {
+	imax := math.MinInt64
+	if len(nums) == 0 {
+		return 0
+	}
+
+	x, y := 1, 1 // x 最大值  y 最小值
+	for i := 0; i < len(nums); i++ {
+		if nums[i] < 0 {
+			x, y = y, x
+		}
+		x = max(x*nums[i], nums[i])
+		y = min(y*nums[i], nums[i])
+		imax = max(imax, x)
+	}
+	return imax
+}
+
+func max(i, j int) int {
+	if i > j {
+		return i
+	}
+	return j
+}
+
+func min(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
 }
