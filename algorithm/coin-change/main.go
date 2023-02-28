@@ -6,10 +6,10 @@ import (
 )
 
 func main() {
-	fmt.Println(coinChange([]int{1, 2, 5}, 11))
+	fmt.Println(coinChange([]int{2}, 3))
 }
 
-func coinChange(coins []int, amount int) int {
+func coinChange1(coins []int, amount int) int {
 	if amount == 0 {
 		return 0
 	}
