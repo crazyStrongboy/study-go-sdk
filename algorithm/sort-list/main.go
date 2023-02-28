@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 
+// todo 待学习 自底向上归并排序
 func main() {
 	result := sortList(&ListNode{
 		Val: 4,
