@@ -44,7 +44,7 @@ func sort(head, tail *ListNode) *ListNode {
 	mid := slow
 	return merge(sort(head, mid), sort(mid, tail))
 }
-func merge(head, tail *ListNode) *ListNode {
+func merge2(head, tail *ListNode) *ListNode {
 	if head == nil {
 		return tail
 	}
@@ -57,6 +57,30 @@ func merge(head, tail *ListNode) *ListNode {
 	}
 	tail.Next = merge(head, tail.Next)
 	return tail
+}
+
+func merge(head, tail *ListNode) *ListNode {
+	dummyHead := &ListNode{}
+	tmp := dummyHead
+	h := head
+	t := tail
+	for h != nil && t != nil {
+		if h.Val < t.Val {
+			dummyHead.Next = h
+			h = h.Next
+		} else {
+			dummyHead.Next = t
+			t = t.Next
+		}
+		dummyHead = dummyHead.Next
+	}
+	if h != nil {
+		dummyHead.Next = h
+	}
+	if t != nil {
+		dummyHead.Next = t
+	}
+	return tmp.Next
 }
 
 type ListNode struct {
