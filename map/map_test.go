@@ -12,7 +12,7 @@ import (
 
 func Test_f(t *testing.T) {
 	//m := map[int]string{} // runtime.makemap
-	m := make(map[int]string,16)
+	m := make(map[int]string, 16)
 	m[1] = "test"
 	fmt.Println(m)
 }
