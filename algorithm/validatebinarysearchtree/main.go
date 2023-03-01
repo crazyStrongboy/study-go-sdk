@@ -11,13 +11,14 @@ func main() {
 		Left: &TreeNode{Val: 4},
 		Right: &TreeNode{
 			Val:   7,
-			Left:  &TreeNode{Val: 6},
+			Left:  &TreeNode{Val: 5},
 			Right: &TreeNode{Val: 8},
 		},
 	}))
 }
 
 func isValidBST(root *TreeNode) bool {
+	return isBST(root, math.MinInt64, math.MaxInt64)
 	t := &t{pre: math.MinInt64}
 	return t.inorder(root)
 }
@@ -43,4 +44,14 @@ type TreeNode struct {
 	Val   int
 	Left  *TreeNode
 	Right *TreeNode
+}
+
+func isBST(root *TreeNode, left, right int) bool {
+	if root == nil {
+		return true
+	}
+	if root.Val <= left || root.Val >= right {
+		return false
+	}
+	return isBST(root.Left, left, root.Val) && isBST(root.Right, root.Val, right)
 }
