@@ -15,12 +15,9 @@ func subarraySum(nums []int, k int) int {
 		j := i
 		for j < len(nums) {
 			sum += nums[j]
-			//if sum > k {
-			//	break
-			//}
 			if sum == k {
 				count++
-				fmt.Println(i, j)
+				//fmt.Println(i, j)
 			}
 			j++
 		}
