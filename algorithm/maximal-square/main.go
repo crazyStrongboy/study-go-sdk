@@ -9,7 +9,7 @@ func main() {
 		{1, 1, 1, 1, 1},
 		{1, 0, 0, 1, 1},
 	}
-	fmt.Println(maximalSquare(matrix))
+	fmt.Println(maximalSquare1(matrix))
 }
 
 func maximalSquare(matrix [][]byte) int {
