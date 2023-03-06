@@ -2,6 +2,7 @@ package main
 
 // dp[i][j]  表示[j:i] 是回文串
 // 1. 如果 s[i] == s[j] ，那么dp[i][j] = dp[i-1][j+1]
+// 1. 如果 s[i] == s[j],i-j==1,也是true
 // 2. 如果i==j,那么dp[i][j] = true
 func countSubstrings(s string) int {
 	var dp [][]bool
@@ -11,7 +12,7 @@ func countSubstrings(s string) int {
 	sum := 0
 	for i := 0; i < len(s); i++ {
 		for j := i; j >= 0; j-- {
-			if i == j || (s[i] == s[j] && (dp[i-1][j+1] || i-j == 1)) {
+			if s[i] == s[j] && (dp[i-1][j+1] || i-j <= 1) {
 				dp[i][j] = true
 				sum++
 			}
