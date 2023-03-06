@@ -6,7 +6,7 @@ func main() {
 	fmt.Println(countSubstrings("aaa"))
 }
 
-func countSubstrings(s string) int {
+func countSubstrings1(s string) int {
 	sum := 0
 	for i := 0; i < len(s); i++ {
 		sum += count(s, i, i, len(s)-1)
