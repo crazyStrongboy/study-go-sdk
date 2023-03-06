@@ -12,7 +12,7 @@ func countSubstrings(s string) int {
 	sum := 0
 	for i := 0; i < len(s); i++ {
 		for j := i; j >= 0; j-- {
-			if s[i] == s[j] && (dp[i-1][j+1] || i-j <= 1) {
+			if i == j || (s[i] == s[j] && (dp[i-1][j+1] || i-j == 1)) {
 				dp[i][j] = true
 				sum++
 			}
