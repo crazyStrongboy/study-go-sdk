@@ -10,7 +10,7 @@ func main() {
 }
 
 // 保证两端最大
-func findUnsortedSubarray(nums []int) int {
+func findUnsortedSubarray1(nums []int) int {
 	if len(nums) <= 1 {
 		return 0
 	}
