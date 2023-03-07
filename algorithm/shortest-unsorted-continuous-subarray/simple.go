@@ -2,7 +2,7 @@ package main
 
 import "math"
 
-func findUnsortedSubarray(nums []int) int {
+func findUnsortedSubarray2(nums []int) int {
 	min, max := math.MaxInt, math.MinInt
 	left, right := -1, -1
 	for i := 0; i < len(nums); i++ {

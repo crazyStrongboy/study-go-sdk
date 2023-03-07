@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	fmt.Println(findUnsortedSubarray([]int{1, 2, 5, 3, 4}))
+	fmt.Println(findUnsortedSubarray([]int{1}))
 }
 
 // 保证两端最大
