@@ -7,22 +7,25 @@ import (
 
 func main() {
 	node := &TreeNode{
-		Val: -10,
+		Val: 10,
 		Left: &TreeNode{
-			Val:   -2,
+			Val:   2,
 			Left:  nil,
 			Right: nil,
 		},
 		Right: &TreeNode{
-			Val:   -3,
-			Left:  &TreeNode{Val: -1},
-			Right: &TreeNode{Val: -2},
+			Val:   3,
+			Left:  &TreeNode{Val: 1},
+			Right: &TreeNode{Val: 2},
 		},
 	}
 
 	fmt.Println(maxPathSum(node))
 }
 
+// 总共只有两种情况：
+// root 作为根节点，取left+right+root.Val 比较最大值
+// root 作为路径中的一个节点，则只能取左右路径中的最大值，返回max(left,right)+root.Val
 func maxPathSum(root *TreeNode) int {
 	t := &T{m: math.MinInt}
 	t.traverse(root)
