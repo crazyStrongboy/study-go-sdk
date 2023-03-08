@@ -5,7 +5,7 @@ package main
 // 分两种情况
 // 1. s[i-1] == '('  dp[i] = dp[i-2]+2
 // 2. s[i-1] == ')'  那么s[i-dp[i-1]-1] == '(',dp[i] =dp[i-1]+2+dp[i-dp[i-1]-2]
-func longestValidParentheses(s string) int {
+func longestValidParentheses2(s string) int {
 	dp := make([]int, len(s))
 	result := 0
 	for i := 1; i < len(s); i++ {

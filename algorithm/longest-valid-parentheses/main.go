@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println(longestValidParentheses("()"))
+	fmt.Println(longestValidParentheses(")(((((()())()()))()(()))("))
 }
 
 func longestValidParentheses1(s string) int {
