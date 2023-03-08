@@ -3,15 +3,24 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println(longestValidParentheses(")()())"))
+	fmt.Println(longestValidParentheses("()"))
 }
 
-func longestValidParentheses(s string) int {
+func longestValidParentheses1(s string) int {
 	result := 0
+	var dp [][]int
+	for i := 0; i <= len(s); i++ {
+		dp = append(dp, make([]int, len(s)))
+	}
 	for i := 1; i <= len(s); i++ {
 		for j := 0; j <= i; j++ {
+			if j-1 >= 0 && dp[i-1][j-1] != 0 {
+				dp[i][j] = dp[i-1][j-1] + 2
+				continue
+			}
 			if isValid(s[j:i]) {
 				result = max(result, i-j)
+				dp[i][j] = i - j
 			}
 		}
 	}
