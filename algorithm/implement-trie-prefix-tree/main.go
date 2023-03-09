@@ -8,12 +8,7 @@ type Trie struct {
 }
 
 type elem struct {
-	val  [26]int
-	next *elem
-}
-
-func (e *elem) String() string {
-	return fmt.Sprintf("val: %v-next: %v\n", e.val, e.next)
+	val [26]*elem
 }
 
 func Constructor() Trie {
@@ -29,21 +24,16 @@ func (this *Trie) Insert(word string) {
 	first := word[0] - 'a'
 	e = this.array[first]
 	if e == nil {
-		e = &elem{
-			val: [26]int{},
-		}
+		e = &elem{val: [26]*elem{}}
 		this.array[first] = e
 	}
 	for i := 1; i < len(word); i++ {
 		index := word[i] - 'a'
-		fmt.Println(index)
-		e.val[index] = 1
-		if e.next == nil {
-			e.next = &elem{
-				val: [26]int{},
-			}
+		//fmt.Println(index)
+		if e.val[index] == nil {
+			e.val[index] = &elem{val: [26]*elem{}}
 		}
-		e = e.next
+		e = e.val[index]
 	}
 }
 
@@ -57,10 +47,10 @@ func (this *Trie) StartsWith(prefix string) bool {
 	}
 	e := this.array[prefix[0]-'a']
 	for i := 1; i < len(prefix); i++ {
-		if e != nil && e.val[prefix[i]-'a'] != 1 {
+		e = e.val[prefix[i]-'a']
+		if e == nil {
 			return false
 		}
-		e = e.next
 	}
 	return true
 }
