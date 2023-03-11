@@ -3,10 +3,10 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println(decodeString("100[leetcode]"))
+	fmt.Println(decodeString("3[a]2[bc]"))
 }
 
-func decodeString(s string) string {
+func decodeString1(s string) string {
 	result := ""
 	i := 0
 	mul := 0
