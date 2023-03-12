@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println(isMatch("ba", ".*b."))
+	fmt.Println(isMatch("ba", "b*b."))
 }
 
 func isMatch(s string, p string) bool {
@@ -29,7 +29,7 @@ func isMatch(s string, p string) bool {
 						many := dp[i-1][j]  // 出现多次
 						dp[i][j] = zero || one || many
 					} else {
-						dp[i][j] = dp[i][j-2] // 出现0次,和上面出现0次一样【s[i-1] != p[j-2]】
+						dp[i][j] = dp[i][j-2] // 抵消一次,和上面出现0次一样【s[i-1] != p[j-2]】
 					}
 				}
 			}
