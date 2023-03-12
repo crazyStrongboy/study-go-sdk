@@ -6,7 +6,7 @@ func main() {
 	fmt.Println(maxCoins([]int{3, 1, 5, 8}))
 }
 
-func maxCoins(nums []int) int {
+func maxCoins1(nums []int) int {
 	t := &T{}
 	t.backtrack(nums, 0)
 	return t.result
