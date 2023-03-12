@@ -3,11 +3,11 @@ package main
 import "fmt"
 
 func main() {
-	xx := findMedianSortedArrays([]int{1, 3}, []int{2})
+	xx := findMedianSortedArrays([]int{1, 3}, []int{2, 4, 6, 7, 8, 9})
 	fmt.Println(xx)
 }
 
-func findMedianSortedArrays(nums1 []int, nums2 []int) float64 {
+func findMedianSortedArrays1(nums1 []int, nums2 []int) float64 {
 	result := merge(nums1, nums2)
 	if len(result) == 0 {
 		return 0
