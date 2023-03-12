@@ -3,82 +3,37 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println(isMatch("ba", ".*."))
+	fmt.Println(isMatch("ba", ".*b."))
 }
 
 func isMatch(s string, p string) bool {
-	i := 0
-	j := 0
-	for j < len(p) && i < len(s) {
-		if j+1 < len(p) && p[j+1] == '*' {
-			if isMatch(s[i:], p[j+2:]) { // 进行回退
-				return true
-			}
+	var dp [][]bool
+	for i := 0; i <= len(s); i++ {
+		dp = append(dp, make([]bool, len(p)+1))
+	}
+	dp[0][0] = true
+	for j := 1; j <= len(p); j++ {
+		if p[j-1] == '*' {
+			dp[0][j] = dp[0][j-2] // 匹配串为空，则只有结尾为'*'才可以一个个抵消
 		}
-		if p[j] == '*' {
-			tmp := p[j-1]
-			if tmp != s[i] && tmp != '.' {
-				j++
+	}
+	for i := 1; i <= len(s); i++ {
+		for j := 1; j <= len(p); j++ {
+			if s[i-1] == p[j-1] || p[j-1] == '.' {
+				dp[i][j] = dp[i-1][j-1]
 			} else {
-				i++
+				if p[j-1] == '*' {
+					if s[i-1] == p[j-2] || p[j-2] == '.' {
+						zero := dp[i][j-2]  // 出现0次
+						one := dp[i-1][j-2] // 出现一次
+						many := dp[i-1][j]  // 出现多次
+						dp[i][j] = zero || one || many
+					} else {
+						dp[i][j] = dp[i][j-2] // 出现0次,和上面出现0次一样【s[i-1] != p[j-2]】
+					}
+				}
 			}
-			continue
-		}
-		if p[j] == '.' {
-			i++
-			j++
-			continue
-		}
-		if s[i] != p[j] {
-			return false
-		}
-		i++
-		j++
-	}
-	if i < len(s) {
-		// 后续都是相同元素，并且p只剩最后一个'*'
-		//if j == len(p)-1 && p[j] == '*' {
-		//	unique := s[i-1]
-		//	for i < len(s) {
-		//		if s[i] != unique {
-		//			return false
-		//		}
-		//		i++
-		//	}
-		//	return true
-		//}
-		// 后续只有一个元素，并且p只剩一个'.'
-		if j == len(p)-1 && p[j] == '.' && i == len(s)-1 {
-			return true
-		}
-		return false
-	}
-	if j < len(p) {
-		if !isBack(p[j:]) {
-			return false
-		}
-		if p[len(p)-1] == '*' {
-			return true
-		}
-		if p[len(p)-1] == s[len(s)-1] && p[j] == '*' {
-			return true
-		}
-		return false
-	}
-	return true
-}
-
-func isBack(s string) bool {
-	cnt := 0
-	for i := range s {
-		if s[i] != '*' {
-			cnt++
-			if cnt > 1 {
-				return false
-			}
-		} else {
-			cnt--
 		}
 	}
-	return cnt <= 1
+	return dp[len(s)][len(p)]
 }
