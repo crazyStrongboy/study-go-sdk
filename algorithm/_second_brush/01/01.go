@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 func twoSum(nums []int, target int) []int {
 	m := make(map[int]int)
@@ -211,4 +214,35 @@ func (t *T) backtrack(digits string, start int, track []byte) {
 		track = track[:len(track)-1]
 	}
 
+}
+
+// threeSum1 三数之和第一版
+func threeSum1(nums []int) [][]int {
+	sort.Ints(nums)
+	m := make(map[int]int)
+	for i := 0; i < len(nums); i++ {
+		m[nums[i]] = i
+	}
+	var result [][]int
+	for i := 0; i < len(nums)-2; i++ {
+		if nums[i] > 0 {
+			break
+		}
+		if i > 0 && nums[i] == nums[i-1] {
+			continue
+		}
+		for j := i + 1; j < len(nums)-1; j++ {
+			if j > i+1 && nums[j] == nums[j-1] {
+				continue
+			}
+			target := 0 - (nums[i] + nums[j])
+			if v, ok := m[target]; ok {
+				if v > j {
+					result = append(result, []int{nums[i], nums[j], target})
+				}
+
+			}
+		}
+	}
+	return result
 }
