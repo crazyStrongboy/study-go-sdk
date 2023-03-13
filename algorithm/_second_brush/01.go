@@ -124,3 +124,35 @@ func longestPalindrome(s string) string {
 	}
 	return result
 }
+
+func isMatch(s string, p string) bool {
+	var dp [][]bool
+	for i := 0; i <= len(s); i++ {
+		dp = append(dp, make([]bool, len(p)+1))
+	}
+	dp[0][0] = true // 都是空，天然true
+	for j := 2; j <= len(p); j++ {
+		if p[j-1] == '*' {
+			dp[0][j] = dp[0][j-2] // 空串初始化dp数组
+		}
+	}
+
+	for i := 1; i <= len(s); i++ {
+		for j := 1; j <= len(p); j++ {
+			if s[i-1] == p[j-1] || p[j-1] == '.' {
+				dp[i][j] = dp[i-1][j-1]
+			} else if p[j-1] == '*' {
+				if s[i-1] == p[j-2] || p[j-2] == '.' {
+					zero := dp[i][j-2]
+					one := dp[i-1][j-2]
+					many := dp[i-1][j]
+					dp[i][j] = zero || one || many
+				} else {
+					dp[i][j] = dp[i][j-2]
+				}
+
+			}
+		}
+	}
+	return dp[len(s)][len(p)]
+}
