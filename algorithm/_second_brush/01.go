@@ -16,3 +16,42 @@ func twoSum(nums []int, target int) []int {
 	}
 	return []int{}
 }
+
+func addTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
+	dummy := &ListNode{}
+	head := dummy
+	pre := 0
+	for l1 != nil && l2 != nil {
+		sum := l1.Val + l2.Val + pre
+		v := sum % 10
+		pre = sum / 10
+		head.Next = &ListNode{Val: v}
+		head = head.Next
+		l1 = l1.Next
+		l2 = l2.Next
+	}
+
+	for l1 != nil {
+		sum := l1.Val + pre
+		v := sum % 10
+		pre = sum / 10
+		head.Next = &ListNode{Val: v}
+		head = head.Next
+		l1 = l1.Next
+	}
+
+	for l2 != nil {
+		sum := l2.Val + pre
+		v := sum % 10
+		pre = sum / 10
+		head.Next = &ListNode{Val: v}
+		head = head.Next
+		l2 = l2.Next
+	}
+
+	if pre != 0 {
+		head.Next = &ListNode{Val: pre}
+	}
+
+	return dummy.Next
+}
