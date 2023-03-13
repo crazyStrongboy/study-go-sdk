@@ -156,3 +156,19 @@ func isMatch(s string, p string) bool {
 	}
 	return dp[len(s)][len(p)]
 }
+
+func maxArea(height []int) int {
+	i := 0
+	j := len(height) - 1
+	result := 0
+	for i < j {
+		result = max(result, (j-i)*min(height[i], height[j]))
+		if height[i] < height[j] {
+			i++
+		} else {
+			j--
+		}
+
+	}
+	return result
+}
