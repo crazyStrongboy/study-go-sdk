@@ -98,3 +98,29 @@ func findMedianValue(nums1 []int, start1 int, nums2 []int, start2 int, k int) in
 		return findMedianValue(nums1, start1, nums2, start2+k/2, max(k-k/2, k-(len(nums2)-start2)))
 	}
 }
+
+func longestPalindrome(s string) string {
+	result := ""
+	for i := 0; i < len(s); i++ {
+		left := i
+		right := i
+		for left >= 0 && right < len(s) && s[left] == s[right] {
+			if right-left+1 > len(result) {
+				result = s[left : right+1]
+			}
+			left--
+			right++
+		}
+		left = i
+		right = i + 1
+		for left >= 0 && right < len(s) && s[left] == s[right] {
+			if right-left+1 > len(result) {
+				result = s[left : right+1]
+			}
+			left--
+			right++
+		}
+
+	}
+	return result
+}
