@@ -70,3 +70,31 @@ func lengthOfLongestSubstring(s string) int {
 	}
 	return result
 }
+
+func findMedianSortedArrays(nums1 []int, nums2 []int) float64 {
+	l1 := len(nums1)
+	l2 := len(nums2)
+	left := (l1 + l2 + 1) / 2
+	right := (l1 + l2 + 2) / 2
+	return float64(findMedianValue(nums1, 0, nums2, 0, left)+findMedianValue(nums1, 0, nums2, 0, right)) / 2
+}
+
+func findMedianValue(nums1 []int, start1 int, nums2 []int, start2 int, k int) int {
+	if start1 >= len(nums1) {
+		return nums2[start2+k-1]
+	}
+	if start2 >= len(nums2) {
+		return nums1[start1+k-1]
+	}
+	if k == 1 {
+		return min(nums1[start1], nums2[start2])
+	}
+	mid1 := min(start1+k/2-1, len(nums1)-1)
+	mid2 := min(start2+k/2-1, len(nums2)-1)
+	//fmt.Println(mid1,mid2)
+	if nums1[mid1] < nums2[mid2] {
+		return findMedianValue(nums1, start1+k/2, nums2, start2, max(k-k/2, k-(len(nums1)-start1)))
+	} else {
+		return findMedianValue(nums1, start1, nums2, start2+k/2, max(k-k/2, k-(len(nums2)-start2)))
+	}
+}
