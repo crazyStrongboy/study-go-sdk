@@ -172,3 +172,43 @@ func maxArea(height []int) int {
 	}
 	return result
 }
+
+func letterCombinations(digits string) []string {
+	if digits == "" {
+		return nil
+	}
+	t := &T{}
+	t.backtrack(digits, 0, []byte{})
+	return t.result
+}
+
+var letters = map[byte]string{
+	'2': "abc",
+	'3': "def",
+	'4': "ghi",
+	'5': "jkl",
+	'6': "mno",
+	'7': "pqrs",
+	'8': "tuv",
+	'9': "wxyz",
+}
+
+type T struct {
+	result []string
+}
+
+func (t *T) backtrack(digits string, start int, track []byte) {
+	if start >= len(digits) {
+		//fmt.Println(string(track))
+		t.result = append(t.result, string(track))
+		return
+	}
+
+	letter := letters[digits[start]]
+	for j := range letter {
+		track = append(track, letter[j])
+		t.backtrack(digits, start+1, track)
+		track = track[:len(track)-1]
+	}
+
+}
