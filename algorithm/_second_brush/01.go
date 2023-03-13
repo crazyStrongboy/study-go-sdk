@@ -55,3 +55,18 @@ func addTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 
 	return dummy.Next
 }
+
+func lengthOfLongestSubstring(s string) int {
+	result := 0
+	m := make(map[byte]int)
+	j := 0
+	for i := 0; i < len(s); i++ {
+		for j < len(s) && m[s[j]] <= 0 {
+			m[s[j]] += 1
+			result = max(result, j-i+1)
+			j++
+		}
+		m[s[i]]--
+	}
+	return result
+}
