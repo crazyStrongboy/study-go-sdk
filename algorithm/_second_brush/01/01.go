@@ -279,3 +279,19 @@ func threeSum(nums []int) [][]int {
 	}
 	return result
 }
+
+func removeNthFromEnd(head *ListNode, n int) *ListNode {
+	dummy := &ListNode{Next: head}
+	slow := dummy
+	fast := dummy
+	count := 0
+	for fast != nil {
+		if count > n {
+			slow = slow.Next
+		}
+		fast = fast.Next
+		count++
+	}
+	slow.Next = slow.Next.Next
+	return dummy.Next
+}
