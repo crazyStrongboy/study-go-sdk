@@ -128,3 +128,37 @@ func merge(list1, list2 *ListNode) *ListNode {
 	}
 	return dummy.Next
 }
+
+func nextPermutation(nums []int) {
+	if len(nums) == 1 {
+		return
+	}
+	start := -1
+	for i := len(nums) - 2; i >= 0; i-- {
+		if nums[i] < nums[i+1] {
+			start = i
+			break
+		}
+	}
+	if start != -1 {
+		for i := len(nums) - 1; i >= 0; i-- {
+			if nums[start] < nums[i] {
+				nums[start], nums[i] = nums[i], nums[start]
+				break
+			}
+		}
+	}
+
+	reverse(nums[start+1:])
+
+}
+
+func reverse(nums []int) {
+	i := 0
+	j := len(nums) - 1
+	for i < j {
+		nums[i], nums[j] = nums[j], nums[i]
+		i++
+		j--
+	}
+}
