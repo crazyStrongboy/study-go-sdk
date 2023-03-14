@@ -82,3 +82,22 @@ func isParenthesis(s string) bool {
 	}
 	return cnt == 0
 }
+
+func generateParenthesis1(n int) []string {
+	var result [][]string
+	for i := 0; i <= n; i++ {
+		result = append(result, []string{})
+	}
+	result[0] = []string{""}
+	result[1] = []string{"()"}
+	for i := 2; i <= n; i++ {
+		for j := 0; j < i; j++ {
+			for _, y := range result[j] {
+				for _, z := range result[i-j-1] {
+					result[i] = append(result[i], "("+y+")"+z)
+				}
+			}
+		}
+	}
+	return result[n]
+}
