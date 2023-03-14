@@ -40,3 +40,45 @@ func mergeTwoLists(list1 *ListNode, list2 *ListNode) *ListNode {
 	}
 	return dummy.Next
 }
+
+func generateParenthesis(n int) []string {
+	t := &T{}
+	t.backtrack(n*2, []byte{})
+	return t.result
+}
+
+var kuohao = []byte{'(', ')'}
+
+type T struct {
+	result []string
+}
+
+func (t *T) backtrack(n int, track []byte) {
+	if n == 0 {
+		if isParenthesis(string(track)) {
+			t.result = append(t.result, string(track))
+		}
+		return
+	}
+	for j := 0; j <= 1; j++ {
+		track = append(track, kuohao[j])
+		t.backtrack(n-1, track)
+		track = track[:len(track)-1]
+	}
+
+}
+
+func isParenthesis(s string) bool {
+	cnt := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '(' {
+			cnt++
+		} else {
+			cnt--
+			if cnt < 0 {
+				return false
+			}
+		}
+	}
+	return cnt == 0
+}
