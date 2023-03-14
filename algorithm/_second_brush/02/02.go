@@ -188,7 +188,7 @@ func search(nums []int, target int) int {
 		mid := i + (j-i)/2
 		if nums[mid] == target {
 			return mid
-		} else if nums[mid] > nums[j] {
+		} else if nums[mid] >= nums[i] {
 			// 左边有序
 			if nums[mid] > target && target >= nums[i] {
 				j = mid - 1
