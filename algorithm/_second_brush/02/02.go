@@ -101,3 +101,30 @@ func generateParenthesis1(n int) []string {
 	}
 	return result[n]
 }
+
+func mergeKLists(lists []*ListNode) *ListNode {
+	if len(lists) == 0 {
+		return nil
+	}
+	pre := lists[0]
+	for i := 1; i < len(lists); i++ {
+		pre = merge(pre, lists[i])
+	}
+	return pre
+}
+
+func merge(list1, list2 *ListNode) *ListNode {
+	dummy := &ListNode{}
+	if list1 == nil {
+		dummy.Next = list2
+	} else if list2 == nil {
+		dummy.Next = list1
+	} else {
+		if list1.Val < list2.Val {
+			dummy.Next = &ListNode{Val: list1.Val, Next: merge(list1.Next, list2)}
+		} else {
+			dummy.Next = &ListNode{Val: list2.Val, Next: merge(list1, list2.Next)}
+		}
+	}
+	return dummy.Next
+}
