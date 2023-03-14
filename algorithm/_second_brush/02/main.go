@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println()
+	fmt.Println(search([]int{3, 1}, 1))
 }
 
 type ListNode struct {
