@@ -84,3 +84,33 @@ func trap(height []int) int {
 	}
 	return result
 }
+
+func permute(nums []int) [][]int {
+	p := &p{used: [21]int{}}
+	p.backtrack(nums, []int{})
+	return p.result
+}
+
+type p struct {
+	result [][]int
+	used   [21]int
+}
+
+func (p *p) backtrack(nums []int, trace []int) {
+	if len(trace) == len(nums) {
+		temp := make([]int, len(nums))
+		copy(temp, trace)
+		p.result = append(p.result, temp)
+		return
+	}
+	for i := 0; i < len(nums); i++ {
+		if p.used[nums[i]+10] == 1 {
+			continue
+		}
+		trace = append(trace, nums[i])
+		p.used[nums[i]+10]++
+		p.backtrack(nums, trace)
+		p.used[nums[i]+10]--
+		trace = trace[:len(trace)-1]
+	}
+}
