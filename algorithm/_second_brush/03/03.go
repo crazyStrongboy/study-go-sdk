@@ -315,3 +315,27 @@ func sortColors(nums []int) {
 		cur1++
 	}
 }
+
+func sortColors1(nums []int) {
+	cur0 := 0
+	cur1 := 0
+	cur2 := 0
+	for i := 0; i < len(nums); i++ {
+		if nums[i] == 0 {
+			nums[cur2] = 2
+			nums[cur1] = 1
+			nums[cur0] = 0
+			cur0++
+			cur1++
+			cur2++
+		} else if nums[i] == 1 {
+			nums[cur2] = 2
+			nums[cur1] = 1
+			cur1++
+			cur2++
+		} else {
+			nums[cur2] = 2
+			cur2++
+		}
+	}
+}
