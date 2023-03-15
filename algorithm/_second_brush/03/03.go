@@ -254,3 +254,16 @@ func climbStairs(n int) int {
 	}
 	return dp[n]
 }
+
+func climbStairs1(n int) int {
+	if n <= 1 {
+		return n
+	}
+	dp := make([]int, 2)
+	dp[0] = 1
+	dp[1] = 2
+	for i := 3; i <= n; i++ {
+		dp[0], dp[1] = dp[1], dp[1]+dp[0]
+	}
+	return dp[1]
+}
