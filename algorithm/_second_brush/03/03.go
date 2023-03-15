@@ -356,3 +356,37 @@ func sortColors2(nums []int) {
 		}
 	}
 }
+
+func minWindow(s string, t string) string {
+	need := make(map[byte]int)
+	for i := 0; i < len(t); i++ {
+		need[t[i]]++
+	}
+	needCount := len(need)
+	result := s + "_"
+	j := 0
+	for i := 0; i < len(s); i++ {
+		if _, ok := need[s[i]]; ok {
+			need[s[i]]--
+			if need[s[i]] == 0 {
+				needCount--
+			}
+		}
+		for needCount == 0 {
+			if len(s[j:i+1]) < len(result) {
+				result = s[j : i+1]
+			}
+			if _, ok := need[s[j]]; ok {
+				need[s[j]]++
+				if need[s[j]] == 1 {
+					needCount++ // 第一次才需要累计
+				}
+			}
+			j++
+		}
+	}
+	if result == s+"_" {
+		return ""
+	}
+	return result
+}
