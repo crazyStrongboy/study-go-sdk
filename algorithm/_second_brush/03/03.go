@@ -165,3 +165,19 @@ func maxSubArray(nums []int) int {
 	}
 	return result
 }
+
+func canJump(nums []int) bool {
+	if len(nums) <= 1 {
+		return true
+	}
+	m := nums[0]
+	i := 1
+	for i <= m {
+		m = max(i+nums[i], m)
+		if m >= len(nums)-1 {
+			return true
+		}
+		i++
+	}
+	return false
+}
