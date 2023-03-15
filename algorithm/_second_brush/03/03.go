@@ -60,3 +60,27 @@ func (s *Sum) backtrack(candidates []int, start, target int, track []int) {
 		track = track[:len(track)-1]
 	}
 }
+
+func trap(height []int) int {
+	var stack []int
+	stack = append(stack, 0)
+	result := 0
+	for i := 1; i < len(height); i++ {
+		for height[i] > height[stack[len(stack)-1]] {
+			mid := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if len(stack) > 0 {
+				left := stack[len(stack)-1]
+				w := (i - left - 1)
+				h := min(height[i], height[left]) - height[mid]
+				result += w * h
+				//fmt.Println(result,left,mid,i)
+			} else {
+				break
+			}
+		}
+		stack = append(stack, i)
+		//fmt.Println(stack)
+	}
+	return result
+}
