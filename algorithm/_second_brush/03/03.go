@@ -181,3 +181,23 @@ func canJump(nums []int) bool {
 	}
 	return false
 }
+
+func merge(intervals [][]int) [][]int {
+	sort.Slice(intervals, func(i, j int) bool {
+		return intervals[i][0] < intervals[j][0]
+	})
+	//fmt.Println(intervals)
+	var result [][]int
+	pre := intervals[0]
+	for i := 1; i < len(intervals); i++ {
+		cur := intervals[i]
+		if cur[0] > pre[1] {
+			result = append(result, pre)
+			pre = cur
+		} else {
+			pre[0], pre[1] = min(pre[0], cur[0]), max(pre[1], cur[1])
+		}
+	}
+	result = append(result, pre)
+	return result
+}
