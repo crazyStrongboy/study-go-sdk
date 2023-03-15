@@ -295,3 +295,23 @@ func minDistance(word1 string, word2 string) int {
 	}
 	return dp[m][n]
 }
+
+func sortColors(nums []int) {
+	cur0 := 0
+	cur1 := 0
+	for i := 0; i < len(nums); i++ {
+		if nums[i] == 0 {
+			nums[cur1] = 1
+			nums[cur0] = 0
+			cur0++
+			cur1++
+		} else if nums[i] == 1 {
+			nums[cur1] = 1
+			cur1++
+		}
+	}
+	for cur1 < len(nums) {
+		nums[cur1] = 2
+		cur1++
+	}
+}
