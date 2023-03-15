@@ -151,3 +151,17 @@ func groupAnagrams(strs []string) [][]string {
 	}
 	return result
 }
+
+func maxSubArray(nums []int) int {
+	pre := 0
+	result := -10001
+	for i := 0; i < len(nums); i++ {
+		pre += nums[i]
+		if pre < nums[i] {
+			pre = nums[i]
+		}
+		//fmt.Println(pre)
+		result = max(result, pre)
+	}
+	return result
+}
