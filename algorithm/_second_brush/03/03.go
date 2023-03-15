@@ -131,3 +131,23 @@ func rotate(matrix [][]int) {
 	}
 	//fmt.Println(matrix)
 }
+
+func groupAnagrams(strs []string) [][]string {
+	m := make(map[[26]int][]string)
+	//fmt.Println(m)
+	for i := 0; i < len(strs); i++ {
+		k := [26]int{}
+		for _, v := range strs[i] {
+			k[v-'a']++
+		}
+		if m[k] == nil {
+			m[k] = []string{}
+		}
+		m[k] = append(m[k], strs[i])
+	}
+	var result [][]string
+	for _, v := range m {
+		result = append(result, v)
+	}
+	return result
+}
