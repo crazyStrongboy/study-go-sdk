@@ -267,3 +267,31 @@ func climbStairs1(n int) int {
 	}
 	return dp[1]
 }
+
+func minDistance(word1 string, word2 string) int {
+	var dp [][]int //dp[i][j]表示以i-1结尾，j-1结尾字符串编辑需要的最少步数
+	m := len(word1)
+	n := len(word2)
+	for i := 0; i <= m; i++ {
+		dp = append(dp, make([]int, n+1))
+	}
+	for i := 0; i <= m; i++ {
+		dp[i][0] = i
+	}
+	for j := 0; j <= n; j++ {
+		dp[0][j] = j
+	}
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if word1[i-1] == word2[j-1] { // 两个字符相等，则不用换
+				dp[i][j] = dp[i-1][j-1]
+			} else {
+				// 替换一个字符  删除一个字符(插入和删除是一样的)
+				dp[i][j] = min(dp[i-1][j-1]+1, min(dp[i][j-1]+1, dp[i-1][j]+1))
+			}
+
+		}
+		//fmt.Println(dp)
+	}
+	return dp[m][n]
+}
