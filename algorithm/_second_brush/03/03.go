@@ -195,7 +195,7 @@ func merge(intervals [][]int) [][]int {
 			result = append(result, pre)
 			pre = cur
 		} else {
-			pre[0], pre[1] = min(pre[0], cur[0]), max(pre[1], cur[1])
+			pre[1] = max(pre[1], cur[1])
 		}
 	}
 	result = append(result, pre)
