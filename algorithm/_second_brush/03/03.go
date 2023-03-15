@@ -114,3 +114,20 @@ func (p *p) backtrack(nums []int, trace []int) {
 		trace = trace[:len(trace)-1]
 	}
 }
+
+func rotate(matrix [][]int) {
+	top := 0
+	bottom := len(matrix) - 1
+	for top < bottom {
+		matrix[top], matrix[bottom] = matrix[bottom], matrix[top]
+		top++
+		bottom--
+	}
+	//fmt.Println(matrix)
+	for i := len(matrix) - 1; i > 0; i-- {
+		for j := 0; j < i; j++ {
+			matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]
+		}
+	}
+	//fmt.Println(matrix)
+}
