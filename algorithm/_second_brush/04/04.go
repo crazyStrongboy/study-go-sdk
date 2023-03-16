@@ -216,3 +216,22 @@ func maxDepth(root *TreeNode) int {
 	}
 	return max(maxDepth(root.Left)+1, maxDepth(root.Right)+1)
 }
+
+func buildTree(preorder []int, inorder []int) *TreeNode {
+	if len(preorder) == 0 {
+		return nil
+	}
+	v := preorder[0]
+	root := &TreeNode{Val: v}
+	index := -1
+	for i := 0; i < len(inorder); i++ {
+		if inorder[i] == v {
+			index = i
+			break
+		}
+	}
+	leftInorder := inorder[0:index]
+	root.Left = buildTree(preorder[1:1+len(leftInorder)], leftInorder)
+	root.Right = buildTree(preorder[1+len(leftInorder):], inorder[index+1:])
+	return root
+}
