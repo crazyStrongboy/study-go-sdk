@@ -235,3 +235,36 @@ func buildTree(preorder []int, inorder []int) *TreeNode {
 	root.Right = buildTree(preorder[1+len(leftInorder):], inorder[index+1:])
 	return root
 }
+
+func flatten(root *TreeNode) {
+	if root == nil {
+		return
+	}
+	dummy := &TreeNode{}
+	head := dummy
+	var stack []*TreeNode
+	stack = append(stack, root)
+	for len(stack) > 0 {
+		r := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if r != nil {
+
+			if r.Right != nil {
+				stack = append(stack, r.Right)
+			}
+			if r.Left != nil {
+				stack = append(stack, r.Left)
+			}
+			stack = append(stack, r)
+			stack = append(stack, nil)
+		} else {
+			temp := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			//fmt.Println(temp.Val)
+			head.Right = &TreeNode{Val: temp.Val}
+			head = head.Right
+		}
+	}
+	root.Right = dummy.Right.Right
+	root.Left = nil
+}
