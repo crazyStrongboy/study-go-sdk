@@ -183,3 +183,29 @@ func equal(left, right *TreeNode) bool {
 	}
 	return false
 }
+
+func levelOrder(root *TreeNode) [][]int {
+	if root == nil {
+		return nil
+	}
+	var result [][]int
+	var queue []*TreeNode
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		size := len(queue)
+		var temp []int
+		for i := 0; i < size; i++ {
+			top := queue[0]
+			queue = queue[1:]
+			temp = append(temp, top.Val)
+			if top.Left != nil {
+				queue = append(queue, top.Left)
+			}
+			if top.Right != nil {
+				queue = append(queue, top.Right)
+			}
+		}
+		result = append(result, temp)
+	}
+	return result
+}
