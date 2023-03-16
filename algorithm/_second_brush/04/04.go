@@ -1,5 +1,7 @@
 package main
 
+import "math"
+
 func subsets(nums []int) [][]int {
 	s := &subSet{used: make(map[int]bool)}
 	s.backtrack(nums, 0, []int{})
@@ -150,4 +152,20 @@ func numTrees(n int) int {
 		}
 	}
 	return dp[n]
+}
+
+func isValidBST(root *TreeNode) bool {
+	left := math.MinInt64
+	right := math.MaxInt64
+	return isValid(root.Left, left, root.Val) && isValid(root.Right, root.Val, right)
+}
+
+func isValid(root *TreeNode, left, right int) bool {
+	if root == nil {
+		return true
+	}
+	if root.Val <= left || root.Val >= right {
+		return false
+	}
+	return isValid(root.Left, left, root.Val) && isValid(root.Right, root.Val, right)
 }
