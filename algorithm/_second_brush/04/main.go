@@ -24,3 +24,9 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+type TreeNode struct {
+	Val   int
+	Left  *TreeNode
+	Right *TreeNode
+}

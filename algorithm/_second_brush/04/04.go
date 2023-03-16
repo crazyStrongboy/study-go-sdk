@@ -93,3 +93,22 @@ func maximalRectangle(matrix [][]byte) int {
 	}
 	return result
 }
+
+func inorderTraversal(root *TreeNode) []int {
+	o := &orderTree{}
+	o.traversal(root)
+	return o.result
+}
+
+type orderTree struct {
+	result []int
+}
+
+func (o *orderTree) traversal(root *TreeNode) {
+	if root == nil {
+		return
+	}
+	o.traversal(root.Left)
+	o.result = append(o.result, root.Val)
+	o.traversal(root.Right)
+}
