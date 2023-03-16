@@ -54,5 +54,25 @@ func backtrack(board [][]byte, word string, i, j, index int) bool {
 		board[i][j] = temp
 	}
 	return false
+}
 
+func largestRectangleArea(heights []int) int {
+	heights = append([]int{0}, heights...)
+	heights = append(heights, 0)
+	var stack []int
+	stack = append(stack, 0)
+	result := 0
+	for i := 1; i < len(heights); i++ {
+		for heights[i] < heights[stack[len(stack)-1]] {
+			mid := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			left := stack[len(stack)-1]
+			w := i - left - 1
+			h := heights[mid]
+			result = max(result, w*h)
+		}
+		stack = append(stack, i)
+		//fmt.Println(stack,result)
+	}
+	return result
 }
