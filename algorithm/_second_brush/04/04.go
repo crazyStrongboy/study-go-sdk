@@ -169,3 +169,17 @@ func isValid(root *TreeNode, left, right int) bool {
 	}
 	return isValid(root.Left, left, root.Val) && isValid(root.Right, root.Val, right)
 }
+
+func isSymmetric(root *TreeNode) bool {
+	return equal(root.Left, root.Right)
+}
+
+func equal(left, right *TreeNode) bool {
+	if left == nil && right == nil {
+		return true
+	}
+	if left != nil && right != nil && left.Val == right.Val {
+		return equal(left.Left, right.Right) && equal(left.Right, right.Left)
+	}
+	return false
+}
