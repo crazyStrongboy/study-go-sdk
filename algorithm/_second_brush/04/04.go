@@ -76,3 +76,20 @@ func largestRectangleArea(heights []int) int {
 	}
 	return result
 }
+
+func maximalRectangle(matrix [][]byte) int {
+	heights := make([]int, len(matrix[0]))
+	result := 0
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[0]); j++ {
+			if matrix[i][j] == '1' {
+				heights[j]++
+			} else {
+				heights[j] = 0
+			}
+		}
+		//fmt.Println(heights)
+		result = max(result, largestRectangleArea(heights))
+	}
+	return result
+}
