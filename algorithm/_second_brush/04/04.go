@@ -112,3 +112,31 @@ func (o *orderTree) traversal(root *TreeNode) {
 	o.result = append(o.result, root.Val)
 	o.traversal(root.Right)
 }
+
+func inorderTraversal2(root *TreeNode) []int {
+	if root == nil {
+		return nil
+	}
+	var result []int
+	var stack []*TreeNode
+	stack = append(stack, root)
+	for len(stack) > 0 {
+		r := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if r != nil {
+			if r.Right != nil {
+				stack = append(stack, r.Right)
+			}
+			stack = append(stack, r)
+			stack = append(stack, nil)
+			if r.Left != nil {
+				stack = append(stack, r.Left)
+			}
+		} else {
+			temp := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			result = append(result, temp.Val)
+		}
+	}
+	return result
+}
