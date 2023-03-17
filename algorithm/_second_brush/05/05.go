@@ -143,3 +143,21 @@ func singleNumber1(nums []int) int {
 
 	return ret
 }
+
+func wordBreak(s string, wordDict []string) bool {
+	dp := make([]bool, len(s)+1)
+	m := make(map[string]bool)
+	for j := 0; j < len(wordDict); j++ {
+		m[wordDict[j]] = true
+	}
+	dp[0] = true
+	for i := 1; i <= len(s); i++ {
+		for j := 0; j < i; j++ {
+			if m[s[j:i]] {
+				dp[i] = dp[i] || dp[j]
+			}
+		}
+		//fmt.Println(dp)
+	}
+	return dp[len(s)]
+}
