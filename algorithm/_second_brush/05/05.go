@@ -121,3 +121,16 @@ func longestConsecutive1(nums []int) int {
 	// fmt.Println(dp)
 	return result + 1
 }
+
+func singleNumber(nums []int) int {
+	arr := [60000]int{}
+	for i := 0; i < len(nums); i++ {
+		arr[nums[i]+30000]++
+	}
+	for i := 0; i < 60000; i++ {
+		if arr[i] == 1 {
+			return i - 30000
+		}
+	}
+	return -1
+}
