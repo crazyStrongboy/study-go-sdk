@@ -42,3 +42,30 @@ func maxProfit2(prices []int) int {
 	}
 	return result
 }
+
+func maxPathSum(root *TreeNode) int {
+	m := &maxPath{result: -1001}
+	m.traverse(root)
+	return m.result
+}
+
+type maxPath struct {
+	result int
+}
+
+func (m *maxPath) traverse(root *TreeNode) int {
+	if root == nil {
+		return 0
+	}
+	l := m.traverse(root.Left)
+	r := m.traverse(root.Right)
+
+	if l < 0 {
+		l = 0
+	}
+	if r < 0 {
+		r = 0
+	}
+	m.result = max(m.result, root.Val+l+r)
+	return max(l+root.Val, r+root.Val)
+}
