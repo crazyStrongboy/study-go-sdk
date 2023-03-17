@@ -268,3 +268,24 @@ func flatten(root *TreeNode) {
 	root.Right = dummy.Right.Right
 	root.Left = nil
 }
+
+func flatten1(root *TreeNode) {
+	f := &Flatten{}
+	f.traverse(root)
+}
+
+type Flatten struct {
+	pre *TreeNode
+}
+
+func (f *Flatten) traverse(root *TreeNode) {
+	if root == nil {
+		return
+	}
+	f.traverse(root.Right)
+	f.traverse(root.Left)
+	root.Right = f.pre
+	root.Left = nil
+	f.pre = root
+	//fmt.Println(pre)
+}
