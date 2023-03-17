@@ -320,3 +320,19 @@ func megerList(list1, list2 *ListNode) *ListNode {
 	}
 	return dummy.Next
 }
+
+func maxProduct(nums []int) int {
+	mx := 1
+	mi := 1
+	result := math.MinInt64
+	for i := 0; i < len(nums); i++ {
+		if nums[i] < 0 {
+			mx, mi = mi, mx
+		}
+		mx = max(mx*nums[i], nums[i])
+		mi = min(mi*nums[i], nums[i])
+		//fmt.Println(mx,mi)
+		result = max(result, mx)
+	}
+	return result
+}
