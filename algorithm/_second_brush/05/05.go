@@ -274,3 +274,49 @@ func removeTail(tail *Node) *Node {
 	tail.Pre = pre
 	return node
 }
+
+func sortList(head *ListNode) *ListNode {
+	return sortx(head, nil)
+}
+
+func sortx(head, tail *ListNode) *ListNode {
+	if head == nil {
+		return head
+	}
+	if head.Next == tail {
+		head.Next = nil
+		return head
+	}
+	slow := head
+	fast := head
+	for fast != tail {
+		slow = slow.Next
+		fast = fast.Next
+		if fast != tail {
+			fast = fast.Next
+		}
+	}
+	mid := slow
+	return megerList(sortx(head, mid), sortx(mid, tail))
+}
+
+func megerList(list1, list2 *ListNode) *ListNode {
+	dummy := &ListNode{}
+	head := dummy
+	for list1 != nil && list2 != nil {
+		if list1.Val < list2.Val {
+			head.Next = &ListNode{Val: list1.Val}
+			list1 = list1.Next
+		} else {
+			head.Next = &ListNode{Val: list2.Val}
+			list2 = list2.Next
+		}
+		head = head.Next
+	}
+	if list1 != nil {
+		head.Next = list1
+	} else {
+		head.Next = list2
+	}
+	return dummy.Next
+}
