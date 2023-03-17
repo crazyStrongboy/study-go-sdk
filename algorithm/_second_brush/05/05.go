@@ -134,3 +134,12 @@ func singleNumber(nums []int) int {
 	}
 	return -1
 }
+
+func singleNumber1(nums []int) int {
+	ret := 0
+	for i := 0; i < len(nums); i++ {
+		ret ^= nums[i]
+	}
+
+	return ret
+}
