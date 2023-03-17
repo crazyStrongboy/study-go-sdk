@@ -69,3 +69,29 @@ func (m *maxPath) traverse(root *TreeNode) int {
 	m.result = max(m.result, root.Val+l+r)
 	return max(l+root.Val, r+root.Val)
 }
+
+func longestConsecutive(nums []int) int {
+	m := make(map[int]int)
+	for i := 0; i < len(nums); i++ {
+		m[nums[i]]++
+	}
+	result := 0
+	for i := 0; i < len(nums); i++ {
+		cur := 1
+
+		add := nums[i] + 1
+		for m[add] != 0 {
+			cur += 1
+			add++
+		}
+
+		sub := nums[i] - 1
+		for m[sub] != 0 {
+			cur += 1
+			sub--
+		}
+
+		result = max(result, cur)
+	}
+	return result
+}
