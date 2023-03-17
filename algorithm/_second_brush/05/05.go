@@ -180,3 +180,23 @@ func hasCycle(head *ListNode) bool {
 	}
 	return false
 }
+
+func detectCycle(head *ListNode) *ListNode {
+	if head == nil || head.Next == nil {
+		return nil
+	}
+	slow := head.Next
+	fast := head.Next.Next
+	for slow != fast {
+		if fast == nil || fast.Next == nil {
+			return nil
+		}
+		slow = slow.Next
+		fast = fast.Next.Next
+	}
+	for head != fast {
+		head = head.Next
+		fast = fast.Next
+	}
+	return head
+}
