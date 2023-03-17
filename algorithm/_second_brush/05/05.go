@@ -200,3 +200,77 @@ func detectCycle(head *ListNode) *ListNode {
 	}
 	return head
 }
+
+type LRUCache struct {
+	m          map[int]*Node
+	tail, head *Node
+	capacity   int
+}
+
+type Node struct {
+	Key, Val int
+	Pre      *Node
+	Next     *Node
+}
+
+func Constructor(capacity int) LRUCache {
+	head := &Node{}
+	tail := &Node{}
+	head.Next = tail
+	tail.Pre = head
+	return LRUCache{
+		m:        make(map[int]*Node),
+		head:     head,
+		tail:     tail,
+		capacity: capacity,
+	}
+}
+
+func (this *LRUCache) Get(key int) int {
+	if v, ok := this.m[key]; ok {
+		release(v)
+		insertAfterHead(this.head, v)
+		return v.Val
+	} else {
+		return -1
+	}
+}
+
+func (this *LRUCache) Put(key int, value int) {
+	if v, ok := this.m[key]; ok {
+		release(v)
+		insertAfterHead(this.head, v)
+		v.Val = value
+	} else {
+		node := &Node{Val: value, Key: key}
+		insertAfterHead(this.head, node)
+		this.m[key] = node
+	}
+	if this.capacity < len(this.m) {
+		node := removeTail(this.tail)
+		delete(this.m, node.Key)
+	}
+}
+
+func release(node *Node) {
+	pre := node.Pre
+	next := node.Next
+	pre.Next = next
+	next.Pre = pre
+}
+
+func insertAfterHead(head, node *Node) {
+	next := head.Next
+	head.Next = node
+	node.Pre = head
+	node.Next = next
+	next.Pre = node
+}
+
+func removeTail(tail *Node) *Node {
+	node := tail.Pre
+	pre := node.Pre
+	pre.Next = tail
+	tail.Pre = pre
+	return node
+}
