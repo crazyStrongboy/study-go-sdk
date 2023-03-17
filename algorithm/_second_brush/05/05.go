@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 func maxProfit(prices []int) int {
 	small := make([]int, len(prices))
@@ -94,4 +97,27 @@ func longestConsecutive(nums []int) int {
 		result = max(result, cur)
 	}
 	return result
+}
+
+func longestConsecutive1(nums []int) int {
+	if len(nums) == 0 {
+		return 0
+	}
+	sort.Ints(nums)
+	//fmt.Println(nums)
+	dp := make([]int, len(nums))
+	result := 0
+	for i := 1; i < len(nums); i++ {
+		if nums[i]-nums[i-1] == 0 {
+			dp[i] = dp[i-1]
+			result = max(result, dp[i])
+		}
+		if nums[i]-nums[i-1] == 1 {
+			dp[i] = dp[i-1] + 1
+			result = max(result, dp[i])
+		}
+
+	}
+	// fmt.Println(dp)
+	return result + 1
 }
