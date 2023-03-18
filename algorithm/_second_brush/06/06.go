@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
 type MinStack struct {
 	stack []*elem
@@ -239,9 +243,10 @@ func (this *Trie) StartsWith(prefix string) bool {
 }
 
 func findKthLargest(nums []int, k int) int {
+	rand.Seed(time.Now().UnixNano())
 	left := 0
 	right := len(nums) - 1
-	mid := left + (right-left)/2
+	mid := rand.Intn(right-left+1) + left
 	fmt.Println(nums)
 	nums[right], nums[mid] = nums[mid], nums[right]
 	fmt.Println(nums)
