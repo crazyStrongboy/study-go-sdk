@@ -100,3 +100,29 @@ func rob(nums []int) int {
 	}
 	return dp[len(nums)]
 }
+
+func numIslands(grid [][]byte) int {
+	count := 0
+	for i := 0; i < len(grid); i++ {
+		for j := 0; j < len(grid[0]); j++ {
+			if grid[i][j] == '1' {
+				gray(grid, i, j)
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func gray(grid [][]byte, i, j int) {
+	if i < 0 || j < 0 || i > len(grid)-1 || j > len(grid[0])-1 {
+		return
+	}
+	if grid[i][j] == '1' {
+		grid[i][j] = '2'
+		gray(grid, i, j-1)
+		gray(grid, i, j+1)
+		gray(grid, i-1, j)
+		gray(grid, i+1, j)
+	}
+}
