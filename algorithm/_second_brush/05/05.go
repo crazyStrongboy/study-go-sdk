@@ -122,6 +122,25 @@ func longestConsecutive1(nums []int) int {
 	return result + 1
 }
 
+func longestConsecutive2(nums []int) int {
+	m := make(map[int]bool)
+	result := 0
+	for i := 0; i < len(nums); i++ {
+		m[nums[i]] = true
+	}
+	for v := range m {
+		if !m[v-1] {
+			cnt := 0
+			for m[v] {
+				v++
+				cnt++
+			}
+			result = max(result, cnt)
+		}
+	}
+	return result
+}
+
 func singleNumber(nums []int) int {
 	arr := [60000]int{}
 	for i := 0; i < len(nums); i++ {
