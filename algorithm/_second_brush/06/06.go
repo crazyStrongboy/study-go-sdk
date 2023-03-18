@@ -126,3 +126,14 @@ func gray(grid [][]byte, i, j int) {
 		gray(grid, i+1, j)
 	}
 }
+
+func reverseList(head *ListNode) *ListNode {
+	var pre *ListNode
+	for head != nil {
+		cur := head.Next
+		head.Next = pre
+		pre = head
+		head = cur
+	}
+	return pre
+}
