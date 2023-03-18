@@ -137,3 +137,52 @@ func reverseList(head *ListNode) *ListNode {
 	}
 	return pre
 }
+
+func canFinish(numCourses int, prerequisites [][]int) bool {
+	m := make(map[int]map[int]bool) // 记录学了k课程可以解锁哪些课程
+	depth := make(map[int]int)
+	for i := 0; i < numCourses; i++ {
+		depth[i] = 0
+	}
+	for i := 0; i < len(prerequisites); i++ {
+		require := prerequisites[i]
+		if m[require[1]] == nil {
+			m[require[1]] = make(map[int]bool)
+		}
+		m[require[1]][require[0]] = true
+		depth[require[0]]++
+	}
+
+	//fmt.Println(m)
+	//fmt.Println(depth)
+	var queue []int
+	for k, v := range depth {
+		if v == 0 {
+			queue = append(queue, k) // 深度为1的课程可以先学习
+			//numCourses --
+		}
+	}
+
+	for len(queue) != 0 {
+		top := queue[0]
+		queue = queue[1:]
+		for k, _ := range m[top] {
+			depth[k]--
+			if depth[k] == 0 { // 前置课程都学习完了，解锁当前课程
+				queue = append(queue, k)
+				// numCourses --
+				// if 0 == numCourses{
+				//     return true
+				// }
+			}
+		}
+	}
+
+	for _, v := range depth {
+		if v != 0 {
+			return false
+		}
+	}
+
+	return true
+}
