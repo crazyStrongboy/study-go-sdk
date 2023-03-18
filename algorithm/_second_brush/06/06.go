@@ -41,3 +41,36 @@ func (this *MinStack) Top() int {
 func (this *MinStack) GetMin() int {
 	return this.stack[len(this.stack)-1].min
 }
+
+func getIntersectionNode(headA, headB *ListNode) *ListNode {
+	a := getListNodeLen(headA)
+	b := getListNodeLen(headB)
+	if a < b {
+		a, b = b, a
+		headA, headB = headB, headA
+	}
+	// fmt.Println(a,b)
+	step := a - b
+	for headA != nil && step > 0 {
+		headA = headA.Next
+		step--
+	}
+
+	for headA != nil && headB != nil && headA != headB {
+		headA = headA.Next
+		headB = headB.Next
+	}
+	if headA == headB {
+		return headA
+	}
+	return nil
+}
+
+func getListNodeLen(head *ListNode) int {
+	cnt := 0
+	for head != nil {
+		cnt++
+		head = head.Next
+	}
+	return cnt
+}
