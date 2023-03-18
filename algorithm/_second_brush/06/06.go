@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type MinStack struct {
 	stack []*elem
 }
@@ -234,4 +236,34 @@ func (this *Trie) StartsWith(prefix string) bool {
 		cur = cur.elem[index]
 	}
 	return true
+}
+
+func findKthLargest(nums []int, k int) int {
+	left := 0
+	right := len(nums) - 1
+	mid := left + (right-left)/2
+	fmt.Println(nums)
+	nums[right], nums[mid] = nums[mid], nums[right]
+	fmt.Println(nums)
+	fmt.Println(nums[right], nums[mid], k)
+	i := 0
+	count := i - 1
+	for i < right {
+		if nums[i] < nums[right] {
+			count++
+			nums[i], nums[count] = nums[count], nums[i]
+		}
+		i++
+	}
+	index := count + 1
+	nums[right], nums[index] = nums[index], nums[right]
+	fmt.Println(i)
+	fmt.Println(nums)
+	//return 0
+	if right-index == k-1 {
+		return nums[index]
+	} else if right-index < k-1 {
+		return findKthLargest(nums[left:index+1], k-(right-index))
+	}
+	return findKthLargest(nums[index+1:right+1], k)
 }

@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println()
+	fmt.Println(findKthLargest([]int{3, 2, 3, 1, 2, 4, 5, 5, 6}, 2))
 }
 
 type ListNode struct {
