@@ -15,3 +15,21 @@
    1. 第一种方式是数组取模
    2. 第二种方式是异或，x^0=x  x^x=0
 8. 最长连续序列（hash表方式）
+9. 数组中第k大元素(快排法)
+   1. 第k大元素则是第index（index=len(nums)-k）个元素
+   2. 随机取mid=rand.Intn(right-left+1)+left,进行移位，使得count+1右边的元素都大于nums[mid]
+   3. 这里要注意需要先交换nums[mid]和nums[right]位置，这样left-->right-1都可以被遍历到
+   4. count计数从left-1开始，如果发现nums[i]<nums[right],那么count++,并交换nums[count]与nums[i]的位置
+   5. count+1与index比较，相等则返回nums[count+1]
+   6. count+1<index,则在右边检索，search(nums,count+2,right,index)
+   7. count+1>index,则在左边检索, search(nums,left,count,index)
+10. 最大正方形
+    1. 定义sideLength=0
+    2. 先将byte二维数组转化成dp int二维数组,只要有一个'1'则sideLength=1
+    3. 然后递推公式 dp[i][j] = min(min(dp[i-1][j-1],dp[i-1][j]),dp[i][j-1])
+    4. 取sideLength=max(sideLength,dp[i][j])即可
+11. 多数元素
+    1. 分别用两个变量记录元素elem和数量count
+    2. 遇见相等的元素，则count++
+    3. 遇见不相等的元素，则count--,如果count==0,那么更换元素
+    4. 最终留下来的elem就是占一半数以上的元素
