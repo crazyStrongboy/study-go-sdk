@@ -272,3 +272,28 @@ func findKthLargest(nums []int, k int) int {
 	}
 	return findKthLargest(nums[index+1:right+1], k)
 }
+
+func maximalSquare(matrix [][]byte) int {
+	dp := make([][]int, len(matrix))
+	slideSize := 0
+	for i := 0; i < len(matrix); i++ {
+		dp[i] = make([]int, len(matrix[0]))
+		for j := 0; j < len(matrix[0]); j++ {
+			if matrix[i][j] == '1' {
+				slideSize = 1
+			}
+			dp[i][j] = int(matrix[i][j] - '0')
+		}
+	}
+
+	for i := 1; i < len(dp); i++ {
+		for j := 1; j < len(dp[0]); j++ {
+			if dp[i][j] != 0 {
+				dp[i][j] = min(min(dp[i][j-1], dp[i-1][j]), dp[i-1][j-1]) + 1
+				slideSize = max(slideSize, dp[i][j])
+			}
+		}
+	}
+
+	return slideSize * slideSize
+}
