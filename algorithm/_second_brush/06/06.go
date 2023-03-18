@@ -186,3 +186,52 @@ func canFinish(numCourses int, prerequisites [][]int) bool {
 
 	return true
 }
+
+type Trie struct {
+	elem  [26]*Trie
+	isEnd bool
+}
+
+func Constructor1() Trie {
+	return Trie{
+		elem: [26]*Trie{},
+	}
+}
+
+func (this *Trie) Insert(word string) {
+	cur := this
+	for i := 0; i < len(word); i++ {
+		index := word[i] - 'a'
+		if cur.elem[index] == nil {
+			cur.elem[index] = &Trie{
+				elem: [26]*Trie{},
+			}
+		}
+		cur = cur.elem[index]
+	}
+	cur.isEnd = true
+}
+
+func (this *Trie) Search(word string) bool {
+	cur := this
+	for i := 0; i < len(word); i++ {
+		index := word[i] - 'a'
+		if cur == nil || cur.elem[index] == nil {
+			return false
+		}
+		cur = cur.elem[index]
+	}
+	return cur.isEnd
+}
+
+func (this *Trie) StartsWith(prefix string) bool {
+	cur := this
+	for i := 0; i < len(prefix); i++ {
+		index := prefix[i] - 'a'
+		if cur == nil || cur.elem[index] == nil {
+			return false
+		}
+		cur = cur.elem[index]
+	}
+	return true
+}
