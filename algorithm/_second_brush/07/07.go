@@ -119,3 +119,19 @@ func searchMatrix(matrix [][]int, target int) bool {
 	}
 	return false
 }
+
+func numSquares(n int) int {
+	dp := make([]int, n+1)
+	for i := 0; i <= n; i++ {
+		dp[i] = i
+	}
+	for i := 2; i <= n; i++ {
+		for j := 1; j < i; j++ {
+			if i >= j*j {
+				dp[i] = min(dp[i-j*j]+1, dp[i])
+			}
+		}
+		//fmt.Println(dp)
+	}
+	return dp[n]
+}
