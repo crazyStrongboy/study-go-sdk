@@ -87,3 +87,20 @@ func productExceptSelf(nums []int) []int {
 	}
 	return result
 }
+
+func maxSlidingWindow(nums []int, k int) []int {
+	var result, stack []int
+	for i := 0; i < len(nums); i++ {
+		for len(stack) > 0 && nums[stack[len(stack)-1]] < nums[i] {
+			stack = stack[:len(stack)-1]
+		}
+		stack = append(stack, i)
+		if i >= k-1 {
+			result = append(result, nums[stack[0]])
+			if stack[0] == i-k+1 {
+				stack = stack[1:]
+			}
+		}
+	}
+	return result
+}
