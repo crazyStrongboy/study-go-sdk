@@ -251,3 +251,21 @@ func s2I(s string) int {
 	i, _ := strconv.Atoi(s)
 	return i
 }
+
+func lengthOfLIS(nums []int) int {
+	dp := make([]int, len(nums))
+	for i := 0; i < len(nums); i++ {
+		dp[i] = 1
+	}
+	result := 1
+	for i := 1; i < len(nums); i++ {
+		for j := 0; j < i; j++ {
+			if nums[i] > nums[j] {
+				dp[i] = max(dp[j]+1, dp[i])
+			}
+			result = max(result, dp[i])
+		}
+		//fmt.Println(dp)
+	}
+	return result
+}
