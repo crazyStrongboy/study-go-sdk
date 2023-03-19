@@ -290,6 +290,36 @@ func findKthLargest(nums []int, k int) int {
 	return findKthLargest(nums[index+1:right+1], k)
 }
 
+func findKthLargest1(nums []int, k int) int {
+	rand.Seed(time.Now().Unix())
+	return topK(nums, 0, len(nums)-1, len(nums)-k)
+}
+
+func topK(nums []int, left, right, index int) int {
+	target := patition(nums, left, right)
+	if target == index {
+		return nums[target]
+	} else if target < index {
+		return topK(nums, target+1, right, index)
+	} else {
+		return topK(nums, left, target-1, index)
+	}
+}
+
+func patition(nums []int, left, right int) int {
+	mid := rand.Intn(right-left+1) + left
+	nums[mid], nums[right] = nums[right], nums[mid]
+	count := left - 1
+	for i := left; i < right; i++ {
+		if nums[i] < nums[right] {
+			count++
+			nums[count], nums[i] = nums[i], nums[count]
+		}
+	}
+	nums[count+1], nums[right] = nums[right], nums[count+1]
+	return count + 1
+}
+
 func maximalSquare(matrix [][]byte) int {
 	dp := make([][]int, len(matrix))
 	slideSize := 0
