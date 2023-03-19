@@ -269,3 +269,51 @@ func lengthOfLIS(nums []int) int {
 	}
 	return result
 }
+
+func removeInvalidParentheses(s string) []string {
+	set := make(map[string]struct{})
+	set[s] = struct{}{}
+	t := &T{}
+	t.recursion(set)
+	return t.result
+}
+
+type T struct {
+	result []string
+}
+
+func (t *T) recursion(set map[string]struct{}) map[string]struct{} {
+	tmp := make(map[string]struct{})
+	for k := range set {
+		if isValid(k) {
+			t.result = append(t.result, k)
+		}
+		if len(t.result) > 0 {
+			continue
+		}
+		for i := 0; i < len(k); i++ {
+			if k[i] == '(' || k[i] == ')' {
+				tmp[k[:i]+k[i+1:]] = struct{}{}
+			}
+		}
+	}
+	if len(tmp) > 0 {
+		return t.recursion(tmp)
+	}
+	return nil
+}
+
+func isValid(s string) bool {
+	cnt := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '(' {
+			cnt++
+		} else if s[i] == ')' {
+			cnt--
+			if cnt < 0 {
+				return false
+			}
+		}
+	}
+	return cnt == 0
+}
