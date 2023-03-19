@@ -342,7 +342,7 @@ func maxCoins(nums []int) int {
 	for i := 0; i < len(nums); i++ {
 		dp[i] = make([]int, len(nums))
 	}
-	for i := len(nums) - 2; i >= 0; i-- {
+	for i := len(nums) - 3; i >= 0; i-- {
 		for j := i + 2; j < len(nums); j++ {
 			for k := i + 1; k < j; k++ {
 				val := nums[i] * nums[k] * nums[j]
