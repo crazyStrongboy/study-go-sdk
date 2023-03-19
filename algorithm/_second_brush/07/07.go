@@ -334,3 +334,21 @@ func maxProfit(prices []int) int {
 
 	return max(dp[len(prices)-1][1], dp[len(prices)-1][2]) // 卖出状态和冷冻期取最大值
 }
+
+func maxCoins(nums []int) int {
+	nums = append([]int{1}, nums...)
+	nums = append(nums, 1)
+	dp := make([][]int, len(nums))
+	for i := 0; i < len(nums); i++ {
+		dp[i] = make([]int, len(nums))
+	}
+	for i := len(nums) - 2; i >= 0; i-- {
+		for j := i + 2; j < len(nums); j++ {
+			for k := i + 1; k < j; k++ {
+				val := nums[i] * nums[k] * nums[j]
+				dp[i][j] = max(dp[i][k]+val+dp[k][j], dp[i][j])
+			}
+		}
+	}
+	return dp[0][len(nums)-1]
+}
