@@ -371,3 +371,19 @@ func coinChange(coins []int, amount int) int {
 	}
 	return dp[amount]
 }
+
+func rob(root *TreeNode) int {
+	arr := robSub(root)
+	return max(arr[0], arr[1])
+}
+
+func robSub(root *TreeNode) []int {
+	if root == nil {
+		return []int{0, 0}
+	}
+	l := robSub(root.Left)
+	r := robSub(root.Right)
+	result := []int{max(l[0], l[1]) + max(r[0], r[1]), root.Val + l[0] + r[0]}
+	//fmt.Println(result)
+	return result
+}
