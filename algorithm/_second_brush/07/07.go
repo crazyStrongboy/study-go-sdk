@@ -135,3 +135,20 @@ func numSquares(n int) int {
 	}
 	return dp[n]
 }
+
+func moveZeroes(nums []int) {
+	count := -1
+	for i := 0; i < len(nums); i++ {
+		if nums[i] != 0 {
+			if i == count {
+				continue
+			}
+			count++
+			nums[count], nums[i] = nums[i], nums[count]
+		}
+	}
+	//fmt.Println(nums,count)
+	for i := count + 1; i < len(nums); i++ {
+		nums[i] = 0
+	}
+}
