@@ -1,5 +1,11 @@
 package main
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 func invertTree(root *TreeNode) *TreeNode {
 	traverse(root)
 	return root
@@ -169,4 +175,79 @@ func findDuplicate(nums []int) int {
 		}
 	}
 	return -1
+}
+
+type Codec struct {
+}
+
+func Constructor() Codec {
+	return Codec{}
+}
+
+// Serializes a tree to a single string.
+func (this *Codec) serialize(root *TreeNode) string {
+	if root == nil {
+		return ""
+	}
+	var result []string
+	var queue []*TreeNode
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		size := len(queue)
+		for i := 0; i < size; i++ {
+			top := queue[0]
+			queue = queue[1:]
+			if top == nil {
+				result = append(result, "null")
+				continue
+			}
+			result = append(result, fmt.Sprintf("%v", top.Val))
+			queue = append(queue, top.Left)
+			queue = append(queue, top.Right)
+		}
+	}
+	//fmt.Println(strings.Join(result,","))
+	return strings.Join(result, ",")
+}
+
+// Deserializes your encoded data to tree.
+func (this *Codec) deserialize(data string) *TreeNode {
+	if data == "" {
+		return nil
+	}
+	arr := strings.Split(data, ",")
+	root := &TreeNode{Val: s2I(arr[0])}
+	arr = arr[1:]
+	var queue []*TreeNode
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		size := len(queue)
+		for i := 0; i < size; i++ {
+			top := queue[0]
+			queue = queue[1:]
+			if top != nil {
+				if arr[0] == "null" {
+					top.Left = nil
+				} else {
+					top.Left = &TreeNode{Val: s2I(arr[0])}
+					queue = append(queue, top.Left)
+				}
+				arr = arr[1:]
+				if arr[0] == "null" {
+					top.Right = nil
+				} else {
+					top.Right = &TreeNode{Val: s2I(arr[0])}
+					queue = append(queue, top.Right)
+				}
+				arr = arr[1:]
+			}
+		}
+
+	}
+	return root
+}
+
+func s2I(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
 }
