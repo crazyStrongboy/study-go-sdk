@@ -94,6 +94,23 @@ func majorityElement(nums []int) int {
 	return 0
 }
 
+func majorityElement1(nums []int) int {
+	elem := nums[0]
+	count := 1
+	for i := 1; i < len(nums); i++ {
+		if elem == nums[i] {
+			count++
+		} else {
+			count--
+			if count == 0 {
+				elem = nums[i]
+				count = 1
+			}
+		}
+	}
+	return elem
+}
+
 func rob(nums []int) int {
 	if len(nums) < 2 {
 		return nums[0]
