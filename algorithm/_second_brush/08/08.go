@@ -118,3 +118,22 @@ func decodeString(s string) string {
 	//result = result+string(tmp)
 	return string(tmp)
 }
+
+func reconstructQueue(people [][]int) [][]int {
+	sort.Slice(people, func(i, j int) bool {
+		if people[i][0] > people[j][0] {
+			return true
+		}
+		return people[i][0] == people[j][0] && people[i][1] < people[j][1]
+	})
+
+	for i := 0; i < len(people); i++ {
+		p := people[i]
+		if p[1] != i {
+			copy(people[i:], people[i+1:])
+			copy(people[p[1]+1:], people[p[1]:])
+			people[p[1]] = p
+		}
+	}
+	return people
+}
