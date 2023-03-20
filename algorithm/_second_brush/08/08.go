@@ -159,3 +159,34 @@ func canPartition(nums []int) bool {
 	}
 	return dp[sum/2]
 }
+
+func pathSum(root *TreeNode, targetSum int) int {
+	t := &T{}
+	t.traverse(root, targetSum)
+	return t.cnt
+}
+
+func (t *T) traverse(root *TreeNode, targetSum int) {
+	if root == nil {
+		return
+	}
+	t.cal(root, targetSum)
+	t.traverse(root.Left, targetSum)
+	t.traverse(root.Right, targetSum)
+}
+
+type T struct {
+	cnt int
+}
+
+func (t *T) cal(root *TreeNode, targetSum int) {
+	if root == nil {
+		return
+	}
+	if targetSum-root.Val == 0 {
+		t.cnt++
+		//fmt.Println(root.Val)
+	}
+	t.cal(root.Left, targetSum-root.Val)
+	t.cal(root.Right, targetSum-root.Val)
+}
