@@ -190,3 +190,49 @@ func (t *T) cal(root *TreeNode, targetSum int) {
 	t.cal(root.Left, targetSum-root.Val)
 	t.cal(root.Right, targetSum-root.Val)
 }
+
+func findAnagrams(s string, p string) []int {
+	if len(p) > len(s) {
+		return nil
+	}
+	m := make(map[byte]int)
+	for i := range p {
+		m[p[i]]++
+	}
+	var result []int
+	i := 0
+	j := 0
+	needCount := len(m)
+	for j < len(p) {
+		if _, ok := m[s[j]]; ok {
+			m[s[j]]--
+			if m[s[j]] == 0 {
+				needCount--
+			}
+		}
+		j++
+	}
+	for i <= len(s)-len(p) && j < len(s) {
+		if needCount == 0 {
+			result = append(result, i)
+		}
+		if _, ok := m[s[i]]; ok {
+			if m[s[i]] == 0 {
+				needCount++
+			}
+			m[s[i]]++
+		}
+		if _, ok := m[s[j]]; ok {
+			m[s[j]]--
+			if m[s[j]] == 0 {
+				needCount--
+			}
+		}
+		i++
+		j++
+	}
+	if needCount == 0 {
+		result = append(result, i)
+	}
+	return result
+}
