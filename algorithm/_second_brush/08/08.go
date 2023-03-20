@@ -83,3 +83,38 @@ func (e *elems) Pop() any {
 	*e = (*e)[:e.Len()-1]
 	return ret
 }
+
+func decodeString(s string) string {
+	var stack []string
+	var nums []int
+	var tmp []byte
+	var n int
+	// var result string
+	for i := 0; i < len(s); i++ {
+		if s[i] == '[' {
+			stack = append(stack, string(tmp))
+			nums = append(nums, n)
+			n = 0
+			tmp = make([]byte, 0)
+		} else if s[i] == ']' {
+			pre := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			size := nums[len(nums)-1]
+			nums = nums[:len(nums)-1]
+			for size > 0 {
+				pre += string(tmp)
+				size--
+			}
+			//result=pre
+			tmp = []byte(pre)
+			//fmt.Println(pre)
+		} else if s[i] >= 'a' && s[i] <= 'z' {
+			tmp = append(tmp, s[i])
+		} else {
+			n = n*10 + int(s[i]-'0')
+			// nums = append(nums,int(s[i]-'0'))
+		}
+	}
+	//result = result+string(tmp)
+	return string(tmp)
+}
