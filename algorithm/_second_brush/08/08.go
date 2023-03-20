@@ -137,3 +137,25 @@ func reconstructQueue(people [][]int) [][]int {
 	}
 	return people
 }
+
+func canPartition(nums []int) bool {
+	sum := 0
+	for i := 0; i < len(nums); i++ {
+		sum += nums[i]
+	}
+	if sum%2 != 0 {
+		return false
+	}
+	dp := make([]bool, sum/2+1)
+	//sort.Ints(nums)
+	dp[0] = true
+	for j := 0; j < len(nums); j++ {
+		for i := sum / 2; i > 0; i-- {
+			if i >= nums[j] && dp[i-nums[j]] {
+				dp[i] = true
+			}
+		}
+		//fmt.Println(dp)
+	}
+	return dp[sum/2]
+}
