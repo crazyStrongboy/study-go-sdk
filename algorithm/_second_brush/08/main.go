@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println()
+	fmt.Println(topKFrequent1([]int{1, 3, 3, 2, 2, 3}, 2))
 }
 
 type ListNode struct {
