@@ -72,5 +72,19 @@ func (b *BST) traverse(root *TreeNode) {
 	b.pre += root.Val
 	root.Val = b.pre
 	b.traverse(root.Left)
+}
 
+func diameterOfBinaryTree(root *TreeNode) int {
+	if root == nil {
+		return 0
+	}
+	return max(max(depth(root.Left)+depth(root.Right), diameterOfBinaryTree(root.Left)),
+		diameterOfBinaryTree(root.Right))
+}
+
+func depth(root *TreeNode) int {
+	if root == nil {
+		return 0
+	}
+	return max(depth(root.Left), depth(root.Right)) + 1
 }
