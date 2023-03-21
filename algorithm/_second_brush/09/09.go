@@ -102,3 +102,18 @@ func subarraySum(nums []int, k int) int {
 	}
 	return count
 }
+
+func subarraySum2(nums []int, k int) int {
+	pre := 0
+	count := 0
+	m := make(map[int]int)
+	m[0] = 1
+	for i := 0; i < len(nums); i++ {
+		pre += nums[i]
+		if v, ok := m[pre-k]; ok {
+			count += v
+		}
+		m[pre] += 1
+	}
+	return count
+}
