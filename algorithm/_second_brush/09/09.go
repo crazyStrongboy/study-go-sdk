@@ -199,3 +199,37 @@ func dailyTemperatures(temperatures []int) []int {
 	}
 	return result
 }
+
+func countSubstrings(s string) int {
+	t := &T{}
+	for i := 0; i < len(s); i++ {
+		t.calPalindrome(s, i)
+	}
+	return t.result
+}
+
+type T struct {
+	result int
+}
+
+func (t *T) calPalindrome(s string, i int) {
+	t.result++
+	j, k := i-1, i+1
+	for j >= 0 && k < len(s) {
+		if s[j] != s[k] {
+			break
+		}
+		t.result++
+		j--
+		k++
+	}
+	j, k = i, i+1
+	for j >= 0 && k < len(s) {
+		if s[j] != s[k] {
+			break
+		}
+		t.result++
+		j--
+		k++
+	}
+}
