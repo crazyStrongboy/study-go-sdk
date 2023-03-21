@@ -164,3 +164,19 @@ func mergeTrees(root1 *TreeNode, root2 *TreeNode) *TreeNode {
 		Right: mergeTrees(root1.Right, root2.Right),
 	}
 }
+
+func leastInterval(tasks []byte, n int) int {
+	m := make(map[byte]int)
+	maxCount := 0
+	for i := 0; i < len(tasks); i++ {
+		m[tasks[i]]++
+		maxCount = max(maxCount, m[tasks[i]])
+	}
+	sub := 0
+	for _, v := range m {
+		if v == maxCount {
+			sub++
+		}
+	}
+	return max(len(tasks), (maxCount-1)*(n+1)+sub)
+}
