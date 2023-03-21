@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 func findDisappearedNumbers(nums []int) []int {
 	n := len(nums)
@@ -116,4 +119,31 @@ func subarraySum2(nums []int, k int) int {
 		m[pre] += 1
 	}
 	return count
+}
+
+func findUnsortedSubarray(nums []int) int {
+	dst := make([]int, len(nums))
+	copy(dst, nums)
+	sort.Ints(dst)
+	left := -1
+	right := len(nums) - 1
+	for i := 0; i < len(nums); i++ {
+		if nums[i] != dst[i] {
+			left = i
+			break
+		}
+	}
+	if left == -1 {
+		return 0
+	}
+	//fmt.Println(dst)
+	for i := len(nums) - 1; i >= 0; i-- {
+		if nums[i] != dst[i] {
+			right = i
+			break
+		}
+	}
+
+	//fmt.Println(left,right)
+	return right - left + 1
 }
