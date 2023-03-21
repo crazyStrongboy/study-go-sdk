@@ -54,3 +54,23 @@ func findTargetSumWays(nums []int, target int) int {
 	}
 	return dp[sum/2]
 }
+func convertBST(root *TreeNode) *TreeNode {
+	b := &BST{}
+	b.traverse(root)
+	return root
+}
+
+type BST struct {
+	pre int
+}
+
+func (b *BST) traverse(root *TreeNode) {
+	if root == nil {
+		return
+	}
+	b.traverse(root.Right)
+	b.pre += root.Val
+	root.Val = b.pre
+	b.traverse(root.Left)
+
+}
