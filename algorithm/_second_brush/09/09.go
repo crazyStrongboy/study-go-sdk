@@ -180,3 +180,22 @@ func leastInterval(tasks []byte, n int) int {
 	}
 	return max(len(tasks), (maxCount-1)*(n+1)+sub)
 }
+
+func dailyTemperatures(temperatures []int) []int {
+	var stack []int
+	stack = append(stack, 0)
+	result := make([]int, len(temperatures))
+	for i := 1; i < len(temperatures); i++ {
+		for len(stack) > 0 {
+			top := stack[len(stack)-1]
+			if temperatures[i] > temperatures[top] {
+				stack = stack[:len(stack)-1]
+				result[top] = i - top
+			} else {
+				break
+			}
+		}
+		stack = append(stack, i)
+	}
+	return result
+}
