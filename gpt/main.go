@@ -60,7 +60,7 @@ func main() {
 		panic(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer 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")
+	req.Header.Set("Authorization", "Bearer xxx")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
